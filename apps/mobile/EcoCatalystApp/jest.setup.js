@@ -48,4 +48,10 @@ jest.mock('@expo/vector-icons', () => {
   };
 });
 
-jest.mock('react-native/Libraries/Animated/NativeAnimatedHelper');
+jest.mock('react-native/Libraries/Animated/NativeAnimatedHelper', () => ({
+  __esModule: true,
+  default: {
+    shouldUseNativeDriver: () => false,
+    API: {},
+  },
+}));

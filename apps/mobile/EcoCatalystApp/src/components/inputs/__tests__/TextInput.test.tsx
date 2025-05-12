@@ -46,7 +46,7 @@ jest.mock('../../../theme/ThemeProvider', () => ({
       },
     },
   })),
-  ThemeProvider: ({ children }) => children,
+  ThemeProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
 
 jest.mock('@expo/vector-icons', () => ({
