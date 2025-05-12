@@ -3,6 +3,7 @@ import { database } from '../../services/firebase';
 import { ref, onValue, set, push, remove, get, query, orderByChild, limitToLast, equalTo } from 'firebase/database';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AuthContext } from '../AuthContext';
+import { getProductByBarcode as fetchProductFromAPI, calculateSustainabilityScore, OpenFoodFactsProduct } from '../../services/api/openFoodFacts';
 
 export interface Product {
   id: string;
@@ -194,7 +195,41 @@ export const ProductsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             id: key,
             ...data[key]
           };
+        } else {
+          const openFoodFactsProduct = await fetchProductFromAPI(barcode);
           
+          if (openFoodFactsProduct) {
+            const sustainabilityData = calculateSustainabilityScore(openFoodFactsProduct);
+            
+            const newProduct: Omit<Product, 'id'> = {
+              barcode: openFoodFactsProduct.code,
+              name: openFoodFactsProduct.product.product_name || 'Unknown Product',
+              brand: openFoodFactsProduct.product.brands || 'Unknown Brand',
+              category: openFoodFactsProduct.product.categories || 'Grocery',
+              sustainabilityScore: sustainabilityData.score,
+              carbonFootprint: sustainabilityData.carbonFootprint,
+              waterUsage: sustainabilityData.waterUsage,
+              recyclable: sustainabilityData.recyclable,
+              biodegradable: sustainabilityData.biodegradable,
+              packaging: sustainabilityData.packaging,
+              ingredients: sustainabilityData.ingredients,
+              certifications: sustainabilityData.certifications,
+              imageUrl: openFoodFactsProduct.product.image_url,
+              createdAt: Date.now(),
+              updatedAt: Date.now()
+            };
+            
+            if (user) {
+              const newProductRef = push(ref(database, 'products'));
+              await set(newProductRef, newProduct);
+              product = { id: newProductRef.key!, ...newProduct };
+            } else {
+              product = { id: `local_${Date.now()}`, ...newProduct };
+            }
+          }
+        }
+        
+        if (product) {
           setProducts(prev => {
             const updated = [...prev];
             const index = updated.findIndex(p => p.id === product!.id);
