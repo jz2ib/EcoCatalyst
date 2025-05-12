@@ -9,6 +9,7 @@ import {
   TouchableOpacityProps,
   View
 } from 'react-native';
+import { useAppTheme } from '../../theme/ThemeProvider';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'outlined' | 'text';
 export type ButtonSize = 'small' | 'medium' | 'large';
@@ -85,21 +86,109 @@ const Button: React.FC<ButtonProps> = ({
   rightIcon,
   ...rest
 }) => {
-  const buttonStyles = [
-    styles.button,
-    styles[`${variant}Button`],
-    styles[`${size}Button`],
-    disabled && styles.disabledButton,
-    style,
-  ];
+  const { theme } = useAppTheme();
   
-  const textStyles = [
-    styles.label,
-    styles[`${variant}Label`],
-    styles[`${size}Label`],
-    disabled && styles.disabledLabel,
-    labelStyle,
-  ];
+  const getButtonStyles = () => {
+    const baseStyles = {
+      ...styles.button,
+      borderRadius: theme.shape.borderRadius.medium,
+    };
+    
+    let variantStyles = {};
+    if (variant === 'primary') {
+      variantStyles = { 
+        backgroundColor: theme.colors.primary,
+        elevation: 2,
+      };
+    } else if (variant === 'secondary') {
+      variantStyles = { 
+        backgroundColor: theme.colors.primaryLight,
+      };
+    } else if (variant === 'outlined') {
+      variantStyles = { 
+        backgroundColor: 'transparent',
+        borderWidth: 1,
+        borderColor: theme.colors.primary,
+      };
+    } else if (variant === 'text') {
+      variantStyles = { 
+        backgroundColor: 'transparent',
+      };
+    }
+    
+    let sizeStyles = {};
+    if (size === 'small') {
+      sizeStyles = {
+        paddingVertical: theme.spacing.xs,
+        paddingHorizontal: theme.spacing.s,
+        minWidth: 64,
+      };
+    } else if (size === 'medium') {
+      sizeStyles = {
+        paddingVertical: theme.spacing.s,
+        paddingHorizontal: theme.spacing.m,
+        minWidth: 88,
+      };
+    } else if (size === 'large') {
+      sizeStyles = {
+        paddingVertical: theme.spacing.m,
+        paddingHorizontal: theme.spacing.l,
+        minWidth: 120,
+      };
+    }
+    
+    const disabledStyles = disabled ? { 
+      backgroundColor: theme.colors.textDisabled,
+      borderColor: theme.colors.textDisabled,
+      elevation: 0,
+    } : {};
+    
+    return [baseStyles, variantStyles, sizeStyles, disabledStyles, style];
+  };
+  
+  const buttonStyles = getButtonStyles();
+  
+  const getTextStyles = () => {
+    const baseStyles = {
+      ...styles.label,
+      fontWeight: '500',
+      textAlign: 'center',
+    };
+    
+    let variantStyles = {};
+    if (variant === 'primary') {
+      variantStyles = { 
+        color: theme.colors.onPrimary,
+      };
+    } else if (variant === 'secondary' || variant === 'outlined' || variant === 'text') {
+      variantStyles = { 
+        color: theme.colors.primary,
+      };
+    }
+    
+    let sizeStyles = {};
+    if (size === 'small') {
+      sizeStyles = {
+        fontSize: theme.typography.fontSize.caption,
+      };
+    } else if (size === 'medium') {
+      sizeStyles = {
+        fontSize: theme.typography.fontSize.button,
+      };
+    } else if (size === 'large') {
+      sizeStyles = {
+        fontSize: theme.typography.fontSize.body1,
+      };
+    }
+    
+    const disabledStyles = disabled ? { 
+      color: theme.colors.textDisabled,
+    } : {};
+    
+    return [baseStyles, variantStyles, sizeStyles, disabledStyles, labelStyle];
+  };
+  
+  const textStyles = getTextStyles();
   
   return (
     <TouchableOpacity
@@ -118,13 +207,13 @@ const Button: React.FC<ButtonProps> = ({
       {loading ? (
         <ActivityIndicator 
           size="small" 
-          color={variant === 'primary' ? '#FFFFFF' : '#4CAF50'} 
+          color={variant === 'primary' ? theme.colors.onPrimary : theme.colors.primary} 
         />
       ) : (
         <>
-          {leftIcon && <View style={styles.iconLeft}>{leftIcon}</View>}
+          {leftIcon && <View style={{ marginRight: theme.spacing.s }}>{leftIcon}</View>}
           <Text style={textStyles}>{label}</Text>
-          {rightIcon && <View style={styles.iconRight}>{rightIcon}</View>}
+          {rightIcon && <View style={{ marginLeft: theme.spacing.s }}>{rightIcon}</View>}
         </>
       )}
     </TouchableOpacity>
@@ -136,76 +225,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 8,
-  },
-  primaryButton: {
-    backgroundColor: '#4CAF50',
-    elevation: 2,
-  },
-  secondaryButton: {
-    backgroundColor: '#E8F5E9',
-  },
-  outlinedButton: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: '#4CAF50',
-  },
-  textButton: {
-    backgroundColor: 'transparent',
-  },
-  smallButton: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    minWidth: 64,
-  },
-  mediumButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    minWidth: 88,
-  },
-  largeButton: {
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-    minWidth: 120,
-  },
-  disabledButton: {
-    backgroundColor: '#E0E0E0',
-    borderColor: '#E0E0E0',
-    elevation: 0,
   },
   label: {
     fontWeight: '500',
     textAlign: 'center',
-  },
-  primaryLabel: {
-    color: '#FFFFFF',
-  },
-  secondaryLabel: {
-    color: '#4CAF50',
-  },
-  outlinedLabel: {
-    color: '#4CAF50',
-  },
-  textLabel: {
-    color: '#4CAF50',
-  },
-  smallLabel: {
-    fontSize: 12,
-  },
-  mediumLabel: {
-    fontSize: 14,
-  },
-  largeLabel: {
-    fontSize: 16,
-  },
-  disabledLabel: {
-    color: '#9E9E9E',
-  },
-  iconLeft: {
-    marginRight: 8,
-  },
-  iconRight: {
-    marginLeft: 8,
   },
 });
 

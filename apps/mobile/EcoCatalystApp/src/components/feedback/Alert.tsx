@@ -9,6 +9,7 @@ import {
   TextStyle,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useAppTheme } from '../../theme/ThemeProvider';
 
 export type AlertType = 'success' | 'error' | 'info' | 'warning';
 
@@ -96,28 +97,30 @@ const Alert: React.FC<AlertProps> = ({
   titleStyle,
   messageStyle,
 }) => {
+  const { theme } = useAppTheme();
+  const styles = createStyles(theme);
   const getAlertTypeStyles = () => {
     switch (type) {
       case 'success':
         return {
           icon: 'check-circle',
-          color: '#4CAF50',
+          color: theme.colors.success,
         };
       case 'error':
         return {
           icon: 'error',
-          color: '#F44336',
+          color: theme.colors.error,
         };
       case 'warning':
         return {
           icon: 'warning',
-          color: '#FF9800',
+          color: theme.colors.warning,
         };
       case 'info':
       default:
         return {
           icon: 'info',
-          color: '#2196F3',
+          color: theme.colors.info,
         };
     }
   };
@@ -185,56 +188,63 @@ const Alert: React.FC<AlertProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: theme.spacing.l,
   },
   container: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.shape.borderRadius.medium,
     width: '100%',
     maxWidth: 400,
-    padding: 24,
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+    padding: theme.spacing.l,
+    ...theme.elevation.medium !== 'none' ? {
+      elevation: 5,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.25,
+      shadowRadius: 3.84,
+    } : {
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: theme.spacing.m,
   },
   title: {
-    fontSize: 20,
+    fontSize: theme.typography.fontSize.h5,
     fontWeight: '500',
-    marginLeft: 12,
+    marginLeft: theme.spacing.m,
+    fontFamily: theme.typography.fontFamily.medium,
   },
   message: {
-    fontSize: 16,
-    color: '#212121',
-    marginBottom: 24,
-    lineHeight: 24,
+    fontSize: theme.typography.fontSize.body1,
+    color: theme.colors.textPrimary,
+    marginBottom: theme.spacing.l,
+    lineHeight: theme.typography.lineHeight.body1,
+    fontFamily: theme.typography.fontFamily.regular,
   },
   buttonContainer: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
   },
   button: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 4,
+    paddingVertical: theme.spacing.s,
+    paddingHorizontal: theme.spacing.m,
+    borderRadius: theme.shape.borderRadius.small,
     minWidth: 64,
     justifyContent: 'center',
     alignItems: 'center',
   },
   primaryButton: {
-    marginLeft: 8,
+    marginLeft: theme.spacing.s,
   },
   secondaryButton: {
     backgroundColor: 'transparent',
@@ -243,16 +253,18 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   primaryButtonText: {
-    color: '#FFFFFF',
-    fontSize: 14,
+    color: theme.colors.onPrimary,
+    fontSize: theme.typography.fontSize.button,
     fontWeight: '500',
     textAlign: 'center',
+    fontFamily: theme.typography.fontFamily.medium,
   },
   secondaryButtonText: {
-    color: '#757575',
-    fontSize: 14,
+    color: theme.colors.textSecondary,
+    fontSize: theme.typography.fontSize.button,
     fontWeight: '500',
     textAlign: 'center',
+    fontFamily: theme.typography.fontFamily.medium,
   },
 });
 

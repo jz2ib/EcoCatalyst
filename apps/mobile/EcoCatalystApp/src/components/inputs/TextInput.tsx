@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useAppTheme } from '../../theme/ThemeProvider';
 
 export interface TextInputProps extends RNTextInputProps {
   /**
@@ -73,6 +74,80 @@ export interface TextInputProps extends RNTextInputProps {
 /**
  * TextInput component that follows Material Design guidelines and WCAG 2.1 AA accessibility standards
  */
+const createStyles = (theme: any) => StyleSheet.create({
+  container: {
+    marginBottom: theme.spacing.m,
+    width: '100%',
+  },
+  label: {
+    fontSize: theme.typography.fontSize.subtitle2,
+    color: theme.colors.textPrimary,
+    marginBottom: theme.spacing.xs,
+    fontWeight: '500',
+  },
+  focusedLabel: {
+    color: theme.colors.primary,
+  },
+  errorLabel: {
+    color: theme.colors.error,
+  },
+  disabledLabel: {
+    color: theme.colors.textDisabled,
+  },
+  requiredAsterisk: {
+    color: theme.colors.error,
+    marginLeft: theme.spacing.xs / 2,
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.shape.borderRadius.medium,
+    backgroundColor: theme.colors.surface,
+  },
+  focusedInputContainer: {
+    borderColor: theme.colors.primary,
+    borderWidth: 2,
+  },
+  errorInputContainer: {
+    borderColor: theme.colors.error,
+  },
+  disabledInputContainer: {
+    backgroundColor: theme.colors.background,
+    borderColor: theme.colors.border,
+  },
+  input: {
+    flex: 1,
+    height: 48,
+    paddingHorizontal: theme.spacing.m,
+    fontSize: theme.typography.fontSize.body1,
+    color: theme.colors.textPrimary,
+  },
+  inputWithLeftIcon: {
+    paddingLeft: 0,
+  },
+  inputWithRightIcon: {
+    paddingRight: 0,
+  },
+  leftIcon: {
+    marginLeft: theme.spacing.m,
+    marginRight: theme.spacing.s,
+  },
+  rightIconContainer: {
+    padding: theme.spacing.m,
+  },
+  helperText: {
+    fontSize: theme.typography.fontSize.caption,
+    color: theme.colors.textSecondary,
+    marginTop: theme.spacing.xs,
+    marginLeft: theme.spacing.xs,
+  },
+  errorText: {
+    color: theme.colors.error,
+  },
+});
+
 const TextInput: React.FC<TextInputProps> = ({
   label,
   error,
@@ -88,6 +163,8 @@ const TextInput: React.FC<TextInputProps> = ({
   secureTextEntry,
   ...rest
 }) => {
+  const { theme } = useAppTheme();
+  const styles = createStyles(theme);
   const [isFocused, setIsFocused] = useState(false);
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   
@@ -131,7 +208,7 @@ const TextInput: React.FC<TextInputProps> = ({
           <MaterialIcons
             name={leftIcon}
             size={20}
-            color={error ? '#FF5252' : isFocused ? '#4CAF50' : '#757575'}
+            color={error ? theme.colors.error : isFocused ? theme.colors.primary : theme.colors.textSecondary}
             style={styles.leftIcon}
           />
         )}
@@ -145,7 +222,7 @@ const TextInput: React.FC<TextInputProps> = ({
           ]}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
-          placeholderTextColor="#9E9E9E"
+          placeholderTextColor={theme.colors.textDisabled}
           editable={!disabled}
           secureTextEntry={isPassword}
           accessibilityLabel={label}
@@ -170,7 +247,7 @@ const TextInput: React.FC<TextInputProps> = ({
             <MaterialIcons
               name={rightIconName as keyof typeof MaterialIcons.glyphMap}
               size={20}
-              color={error ? '#FF5252' : isFocused ? '#4CAF50' : '#757575'}
+              color={error ? theme.colors.error : isFocused ? theme.colors.primary : theme.colors.textSecondary}
             />
           </TouchableOpacity>
         )}
@@ -192,78 +269,5 @@ const TextInput: React.FC<TextInputProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    marginBottom: 16,
-    width: '100%',
-  },
-  label: {
-    fontSize: 14,
-    color: '#212121',
-    marginBottom: 6,
-    fontWeight: '500',
-  },
-  focusedLabel: {
-    color: '#4CAF50',
-  },
-  errorLabel: {
-    color: '#FF5252',
-  },
-  disabledLabel: {
-    color: '#9E9E9E',
-  },
-  requiredAsterisk: {
-    color: '#FF5252',
-    marginLeft: 2,
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    borderRadius: 8,
-    backgroundColor: '#FFFFFF',
-  },
-  focusedInputContainer: {
-    borderColor: '#4CAF50',
-    borderWidth: 2,
-  },
-  errorInputContainer: {
-    borderColor: '#FF5252',
-  },
-  disabledInputContainer: {
-    backgroundColor: '#F5F5F5',
-    borderColor: '#E0E0E0',
-  },
-  input: {
-    flex: 1,
-    height: 48,
-    paddingHorizontal: 12,
-    fontSize: 16,
-    color: '#212121',
-  },
-  inputWithLeftIcon: {
-    paddingLeft: 0,
-  },
-  inputWithRightIcon: {
-    paddingRight: 0,
-  },
-  leftIcon: {
-    marginLeft: 12,
-    marginRight: 8,
-  },
-  rightIconContainer: {
-    padding: 12,
-  },
-  helperText: {
-    fontSize: 12,
-    color: '#757575',
-    marginTop: 4,
-    marginLeft: 4,
-  },
-  errorText: {
-    color: '#FF5252',
-  },
-});
 
 export default TextInput;

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Text, StyleSheet, TextStyle, TextProps } from 'react-native';
+import { useAppTheme } from '../../theme/ThemeProvider';
 
 export type TypographyVariant = 
   | 'h1' 
@@ -30,7 +31,7 @@ export interface TypographyProps extends TextProps {
   
   /**
    * Text color
-   * @default '#212121'
+   * If not provided, uses theme.colors.textPrimary
    */
   color?: string;
   
@@ -64,16 +65,19 @@ export interface TypographyProps extends TextProps {
 const Typography: React.FC<TypographyProps> = ({
   children,
   variant = 'body1',
-  color = '#212121',
+  color,
   center = false,
   bold = false,
   italic = false,
   style,
   ...rest
 }) => {
+  const { theme } = useAppTheme();
+  const styles = createStyles(theme);
+  
   const textStyles = [
     styles[variant],
-    { color },
+    { color: color || theme.colors.textPrimary },
     center && styles.center,
     bold && styles.bold,
     italic && styles.italic,
@@ -98,86 +102,99 @@ const Typography: React.FC<TypographyProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   h1: {
-    fontSize: 32,
-    lineHeight: 40,
+    fontSize: theme.typography.fontSize.h1,
+    lineHeight: theme.typography.lineHeight.h1,
     fontWeight: '300',
     letterSpacing: -0.5,
+    fontFamily: theme.typography.fontFamily.regular,
   },
   h2: {
-    fontSize: 28,
-    lineHeight: 36,
+    fontSize: theme.typography.fontSize.h2,
+    lineHeight: theme.typography.lineHeight.h2,
     fontWeight: '300',
     letterSpacing: 0,
+    fontFamily: theme.typography.fontFamily.regular,
   },
   h3: {
-    fontSize: 24,
-    lineHeight: 32,
+    fontSize: theme.typography.fontSize.h3,
+    lineHeight: theme.typography.lineHeight.h3,
     fontWeight: '400',
     letterSpacing: 0.25,
+    fontFamily: theme.typography.fontFamily.regular,
   },
   h4: {
-    fontSize: 20,
-    lineHeight: 28,
+    fontSize: theme.typography.fontSize.h4,
+    lineHeight: theme.typography.lineHeight.h4,
     fontWeight: '400',
     letterSpacing: 0.15,
+    fontFamily: theme.typography.fontFamily.regular,
   },
   h5: {
-    fontSize: 18,
-    lineHeight: 26,
+    fontSize: theme.typography.fontSize.h5,
+    lineHeight: theme.typography.lineHeight.h5,
     fontWeight: '500',
     letterSpacing: 0.15,
+    fontFamily: theme.typography.fontFamily.medium,
   },
   h6: {
-    fontSize: 16,
-    lineHeight: 24,
+    fontSize: theme.typography.fontSize.h6,
+    lineHeight: theme.typography.lineHeight.h6,
     fontWeight: '500',
     letterSpacing: 0.15,
+    fontFamily: theme.typography.fontFamily.medium,
   },
   subtitle1: {
-    fontSize: 16,
-    lineHeight: 24,
+    fontSize: theme.typography.fontSize.subtitle1,
+    lineHeight: theme.typography.lineHeight.subtitle1,
     fontWeight: '400',
     letterSpacing: 0.15,
+    fontFamily: theme.typography.fontFamily.regular,
   },
   subtitle2: {
-    fontSize: 14,
-    lineHeight: 22,
+    fontSize: theme.typography.fontSize.subtitle2,
+    lineHeight: theme.typography.lineHeight.subtitle2,
     fontWeight: '500',
     letterSpacing: 0.1,
+    fontFamily: theme.typography.fontFamily.medium,
   },
   body1: {
-    fontSize: 16,
-    lineHeight: 24,
+    fontSize: theme.typography.fontSize.body1,
+    lineHeight: theme.typography.lineHeight.body1,
     fontWeight: '400',
     letterSpacing: 0.5,
+    fontFamily: theme.typography.fontFamily.regular,
   },
   body2: {
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: theme.typography.fontSize.body2,
+    lineHeight: theme.typography.lineHeight.body2,
     fontWeight: '400',
     letterSpacing: 0.25,
+    fontFamily: theme.typography.fontFamily.regular,
   },
   button: {
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: theme.typography.fontSize.button,
+    lineHeight: theme.typography.lineHeight.button,
     fontWeight: '500',
     letterSpacing: 1.25,
     textTransform: 'uppercase',
+    fontFamily: theme.typography.fontFamily.medium,
   },
   caption: {
-    fontSize: 12,
-    lineHeight: 16,
+    fontSize: theme.typography.fontSize.caption,
+    lineHeight: theme.typography.lineHeight.caption,
     fontWeight: '400',
     letterSpacing: 0.4,
+    fontFamily: theme.typography.fontFamily.regular,
   },
   overline: {
-    fontSize: 10,
-    lineHeight: 14,
+    fontSize: theme.typography.fontSize.overline,
+    lineHeight: theme.typography.lineHeight.overline,
     fontWeight: '400',
     letterSpacing: 1.5,
     textTransform: 'uppercase',
+    fontFamily: theme.typography.fontFamily.regular,
   },
   center: {
     textAlign: 'center',

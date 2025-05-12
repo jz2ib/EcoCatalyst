@@ -9,6 +9,7 @@ import {
   TextStyle,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useAppTheme } from '../../theme/ThemeProvider';
 
 export type ToastType = 'success' | 'error' | 'info' | 'warning';
 
@@ -71,6 +72,8 @@ const Toast: React.FC<ToastProps> = ({
   messageStyle,
   position = 'bottom',
 }) => {
+  const { theme } = useAppTheme();
+  const styles = createStyles(theme);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
@@ -79,23 +82,23 @@ const Toast: React.FC<ToastProps> = ({
       case 'success':
         return {
           icon: 'check-circle',
-          backgroundColor: '#4CAF50',
+          backgroundColor: theme.colors.success,
         };
       case 'error':
         return {
           icon: 'error',
-          backgroundColor: '#F44336',
+          backgroundColor: theme.colors.error,
         };
       case 'warning':
         return {
           icon: 'warning',
-          backgroundColor: '#FF9800',
+          backgroundColor: theme.colors.warning,
         };
       case 'info':
       default:
         return {
           icon: 'info',
-          backgroundColor: '#2196F3',
+          backgroundColor: theme.colors.info,
         };
     }
   };
@@ -176,20 +179,25 @@ const Toast: React.FC<ToastProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 8,
-    marginHorizontal: 16,
-    elevation: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.27,
-    shadowRadius: 4.65,
+    paddingHorizontal: theme.spacing.m,
+    paddingVertical: theme.spacing.s,
+    borderRadius: theme.shape.borderRadius.medium,
+    marginHorizontal: theme.spacing.m,
+    ...theme.elevation.large !== 'none' ? {
+      elevation: 6,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 3 },
+      shadowOpacity: 0.27,
+      shadowRadius: 4.65,
+    } : {
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
     position: 'absolute',
     left: 0,
     right: 0,
@@ -207,13 +215,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   message: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    marginLeft: 12,
+    color: theme.colors.onPrimary,
+    fontSize: theme.typography.fontSize.body2,
+    marginLeft: theme.spacing.m,
     flex: 1,
+    fontFamily: theme.typography.fontFamily.regular,
   },
   closeButton: {
-    padding: 4,
+    padding: theme.spacing.xs,
   },
 });
 
