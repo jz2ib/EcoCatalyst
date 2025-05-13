@@ -4,6 +4,7 @@ import { ref, onValue, set, push, remove, get, query, orderByChild, limitToLast,
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AuthContext } from '../AuthContext';
 import { getProductByBarcode as fetchProductFromAPI, calculateSustainabilityScore, OpenFoodFactsProduct } from '../../services/api/openFoodFacts';
+import { getAlternativeProducts, submitRecommendationFeedback, RecommendationCriteria, AlternativeProduct as ApiAlternativeProduct } from '../../services/api/productAlternatives';
 
 export interface Product {
   id: string;
@@ -41,6 +42,7 @@ export interface AlternativeProduct {
   alternativeProductId: string;
   sustainabilityImprovement: number; // percentage improvement
   reason: string;
+  product?: ApiAlternativeProduct; // The actual alternative product data
 }
 
 interface ProductsContextType {
@@ -52,7 +54,8 @@ interface ProductsContextType {
   scanProduct: (barcode: string) => Promise<Product | null>;
   getProductById: (id: string) => Promise<Product | null>;
   getProductByBarcode: (barcode: string) => Promise<Product | null>;
-  getAlternativesForProduct: (productId: string) => Promise<AlternativeProduct[]>;
+  getAlternativesForProduct: (productId: string, criteria?: RecommendationCriteria) => Promise<AlternativeProduct[]>;
+  submitAlternativeFeedback: (productId: string, alternativeId: string, feedback: { helpful: boolean; reason?: string; purchased?: boolean }) => Promise<boolean>;
   addProductScan: (productId: string, location?: { latitude: number; longitude: number }) => Promise<void>;
   clearRecentScans: () => Promise<void>;
   clearError: () => void;
@@ -71,6 +74,7 @@ export const ProductsContext = createContext<ProductsContextType>({
   getProductById: async () => null,
   getProductByBarcode: async () => null,
   getAlternativesForProduct: async () => [],
+  submitAlternativeFeedback: async () => false,
   addProductScan: async () => {},
   clearRecentScans: async () => {},
   clearError: () => {},
@@ -331,12 +335,13 @@ export const ProductsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   };
   
-  const getAlternativesForProduct = async (productId: string): Promise<AlternativeProduct[]> => {
+  const getAlternativesForProduct = async (productId: string, criteria?: RecommendationCriteria): Promise<AlternativeProduct[]> => {
     try {
       if (alternativeProducts[productId]) {
         return alternativeProducts[productId];
       }
       
+      // Check Firebase for stored alternatives
       const alternativesRef = ref(database, `alternatives/${productId}`);
       const snapshot = await get(alternativesRef);
       const data = snapshot.val();
@@ -355,12 +360,105 @@ export const ProductsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         return alternatives;
       }
       
+      const product = await getProductById(productId);
+      
+      if (!product) {
+        throw new Error('Product not found');
+      }
+      
+      const apiAlternatives = await getAlternativeProducts(
+        productId,
+        product.barcode,
+        product.category,
+        criteria
+      );
+      
+      if (apiAlternatives.length > 0) {
+        const alternatives: AlternativeProduct[] = apiAlternatives.map(alt => {
+          const improvementPercentage = 
+            ((alt.sustainabilityScore - product.sustainabilityScore) / product.sustainabilityScore) * 100;
+          
+          return {
+            id: alt.id,
+            originalProductId: productId,
+            alternativeProductId: alt.id,
+            sustainabilityImprovement: Math.max(0, improvementPercentage), // Ensure positive value
+            reason: getImprovementReason(product, alt),
+            product: alt
+          };
+        });
+        
+        const betterAlternatives = alternatives.filter(
+          alt => alt.sustainabilityImprovement > 0
+        );
+        
+        if (user && betterAlternatives.length > 0) {
+          const alternativesRef = ref(database, `alternatives/${productId}`);
+          
+          const alternativesData = betterAlternatives.reduce((acc, alt) => {
+            const { product, ...altWithoutProduct } = alt;
+            acc[alt.id] = altWithoutProduct;
+            return acc;
+          }, {} as Record<string, Omit<AlternativeProduct, 'product'>>);
+          
+          await set(alternativesRef, alternativesData);
+        }
+        
+        setAlternativeProducts(prev => ({
+          ...prev,
+          [productId]: betterAlternatives
+        }));
+        
+        return betterAlternatives;
+      }
+      
       return [];
     } catch (error) {
       console.error('Error getting alternative products:', error);
       setError('Failed to get eco-friendly alternatives. Please try again.');
       return [];
     }
+  };
+  
+  const getImprovementReason = (
+    originalProduct: Product, 
+    alternativeProduct: ApiAlternativeProduct
+  ): string => {
+    const reasons: string[] = [];
+    
+    if (alternativeProduct.sustainabilityScore > originalProduct.sustainabilityScore) {
+      reasons.push(`${Math.round(alternativeProduct.sustainabilityScore - originalProduct.sustainabilityScore)} points higher sustainability score`);
+    }
+    
+    if (alternativeProduct.recyclable && !originalProduct.recyclable) {
+      reasons.push('recyclable packaging');
+    }
+    
+    if (alternativeProduct.biodegradable && !originalProduct.biodegradable) {
+      reasons.push('biodegradable materials');
+    }
+    
+    if (alternativeProduct.carbonFootprint < originalProduct.carbonFootprint) {
+      reasons.push(`${Math.round((1 - alternativeProduct.carbonFootprint / originalProduct.carbonFootprint) * 100)}% lower carbon footprint`);
+    }
+    
+    if (alternativeProduct.waterUsage < originalProduct.waterUsage) {
+      reasons.push(`${Math.round((1 - alternativeProduct.waterUsage / originalProduct.waterUsage) * 100)}% less water usage`);
+    }
+    
+    if (alternativeProduct.certifications.length > originalProduct.certifications.length) {
+      const uniqueCertifications = alternativeProduct.certifications.filter(
+        cert => !originalProduct.certifications.includes(cert)
+      );
+      
+      if (uniqueCertifications.length > 0) {
+        reasons.push(`additional certifications: ${uniqueCertifications.join(', ')}`);
+      }
+    }
+    
+    return reasons.length > 0 
+      ? `Better alternative with ${reasons.join(', ')}`
+      : 'More sustainable alternative';
   };
   
   const addProductScan = async (productId: string, location?: { latitude: number; longitude: number }): Promise<void> => {
@@ -417,6 +515,30 @@ export const ProductsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setError(null);
   };
   
+  const submitAlternativeFeedback = async (
+    productId: string, 
+    alternativeId: string, 
+    feedback: { helpful: boolean; reason?: string; purchased?: boolean }
+  ): Promise<boolean> => {
+    try {
+      const result = await submitRecommendationFeedback(productId, alternativeId, feedback);
+      
+      if (user && result) {
+        const feedbackRef = ref(database, `feedback/${user.uid}/${productId}/${alternativeId}`);
+        await set(feedbackRef, {
+          ...feedback,
+          timestamp: Date.now()
+        });
+      }
+      
+      return result;
+    } catch (error) {
+      console.error('Error submitting alternative feedback:', error);
+      setError('Failed to submit feedback. Please try again.');
+      return false;
+    }
+  };
+  
   const value = {
     products,
     recentScans,
@@ -427,6 +549,7 @@ export const ProductsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     getProductById,
     getProductByBarcode,
     getAlternativesForProduct,
+    submitAlternativeFeedback,
     addProductScan,
     clearRecentScans,
     clearError,

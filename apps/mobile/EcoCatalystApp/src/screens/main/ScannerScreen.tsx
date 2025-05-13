@@ -6,7 +6,8 @@ import * as tf from '@tensorflow/tfjs';
 import { cameraWithTensors } from '@tensorflow/tfjs-react-native';
 import { useProducts } from '../../contexts/products/ProductsContext';
 import ScanResultModal from '../../components/modals/ScanResultModal';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, NavigationProp } from '@react-navigation/native';
+import { MainTabParamList } from '../../navigation/types';
 import { MaterialIcons } from '@expo/vector-icons';
 
 const TensorCamera = cameraWithTensors(Camera);
@@ -23,7 +24,7 @@ const ScannerScreen: React.FC = () => {
   const [modelReady, setModelReady] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const cameraRef = useRef<Camera>(null);
-  const navigation = useNavigation();
+  const navigation = useNavigation<NavigationProp<MainTabParamList>>();
   
   const { 
     scanProduct, 
@@ -87,16 +88,12 @@ const ScannerScreen: React.FC = () => {
     if (!scannedProduct) return;
     
     setShowModal(false);
-    
-    const alternatives = await getAlternativesForProduct(scannedProduct.id);
-    
-    if (alternatives.length > 0) {
-      Alert.alert('Alternatives', `Found ${alternatives.length} eco-friendly alternatives.`);
-    } else {
-      Alert.alert('No Alternatives', 'No eco-friendly alternatives found for this product.');
-    }
-    
     setScanned(false);
+    
+    navigation.navigate('AlternativeProducts', {
+      productId: scannedProduct.id,
+      productName: scannedProduct.name
+    });
   };
   
   if (hasPermission === null) {
