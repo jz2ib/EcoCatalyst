@@ -456,58 +456,76 @@ export const GamificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }),
   [achievements]);
   
-  const getCompletedAchievements = (): UserAchievement[] => {
-    return userAchievements.filter(ua => ua.progress === 100);
-  };
+  const getCompletedAchievements = useMemo(() => 
+    performanceOptimizer.memoize((): UserAchievement[] => {
+      return userAchievements.filter(ua => ua.progress === 100);
+    }),
+  [userAchievements]);
   
-  const getInProgressAchievements = (): { achievement: Achievement; userAchievement: UserAchievement }[] => {
-    return userAchievements
-      .filter(ua => ua.progress > 0 && ua.progress < 100)
-      .map(ua => {
-        const achievement = getAchievementById(ua.achievementId);
-        if (!achievement) return null;
-        return { achievement, userAchievement: ua };
-      })
-      .filter((item): item is { achievement: Achievement; userAchievement: UserAchievement } => item !== null);
-  };
+  const getInProgressAchievements = useMemo(() => 
+    performanceOptimizer.memoize((): { achievement: Achievement; userAchievement: UserAchievement }[] => {
+      return userAchievements
+        .filter(ua => ua.progress > 0 && ua.progress < 100)
+        .map(ua => {
+          const achievement = getAchievementById(ua.achievementId);
+          if (!achievement) return null;
+          return { achievement, userAchievement: ua };
+        })
+        .filter((item): item is { achievement: Achievement; userAchievement: UserAchievement } => item !== null);
+    }),
+  [userAchievements, getAchievementById]);
   
-  const getLeaderboard = async (limit: number = 10): Promise<LeaderboardEntry[]> => {
-    try {
-      if (leaderboard.length > 0 && limit <= leaderboard.length) {
-        return leaderboard.slice(0, limit);
-      }
-      
-      const leaderboardRef = query(
-        ref(database, 'userStats'),
-        orderByChild('totalPoints'),
-        limitToLast(limit)
-      );
-      
-      const snapshot = await get(leaderboardRef);
-      const data = snapshot.val();
-      
-      if (data) {
-        const entries = Object.keys(data).map(key => ({
-          userId: key,
-          displayName: data[key].displayName || 'Anonymous',
-          photoURL: data[key].photoURL,
-          totalPoints: data[key].totalPoints || 0,
-          level: data[key].level || 1
-        }));
+  const getLeaderboard = useCallback(
+    async (limit: number = 10): Promise<LeaderboardEntry[]> => {
+      try {
+        if (leaderboard.length > 0 && limit <= leaderboard.length) {
+          return leaderboard.slice(0, limit);
+        }
         
-        entries.sort((a, b) => b.totalPoints - a.totalPoints);
+        if (!networkManager.isConnected()) {
+          return leaderboard;
+        }
         
-        setLeaderboard(entries);
-        return entries;
+        const leaderboardRef = query(
+          ref(database, 'userStats'),
+          orderByChild('totalPoints'),
+          limitToLast(limit)
+        );
+        
+        const snapshot = await get(leaderboardRef);
+        const data = snapshot.val();
+        
+        if (data) {
+          const entries = Object.keys(data).map(key => ({
+            userId: key,
+            displayName: data[key].displayName || 'Anonymous',
+            photoURL: data[key].photoURL,
+            totalPoints: data[key].totalPoints || 0,
+            level: data[key].level || 1
+          }));
+          
+          entries.sort((a, b) => b.totalPoints - a.totalPoints);
+          
+          performanceOptimizer.runAfterInteractions(() => {
+            setLeaderboard(entries);
+          });
+          
+          return entries;
+        }
+        
+        return [];
+      } catch (error) {
+        errorHandler.handleError(
+          error instanceof Error ? error : String(error),
+          ErrorType.UNKNOWN,
+          ErrorSeverity.MEDIUM,
+          { method: 'getLeaderboard', limit }
+        );
+        return [];
       }
-      
-      return [];
-    } catch (error) {
-      console.error('Error getting leaderboard:', error);
-      setError('Failed to get leaderboard. Please try again.');
-      return [];
-    }
-  };
+    },
+    [leaderboard]
+  );
   
   const recordActivity = useCallback(
     performanceOptimizer.throttle(async (activityType: RequirementType, value: number): Promise<void> => {
@@ -555,7 +573,7 @@ export const GamificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     setError(null);
   };
   
-  const value = {
+  const value: GamificationContextType = {
     achievements,
     userAchievements,
     userStats,
@@ -564,12 +582,14 @@ export const GamificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     error,
     checkAchievements,
     updateUserStats,
-    getAchievementById,
-    getAchievementsByCategory,
-    getCompletedAchievements,
-    getInProgressAchievements,
+    getAchievementById: (id: string) => getAchievementById(id),
+    getAchievementsByCategory: (category: AchievementCategory) => getAchievementsByCategory(category),
+    getCompletedAchievements: () => getCompletedAchievements(),
+    getInProgressAchievements: () => getInProgressAchievements(),
     getLeaderboard,
-    recordActivity,
+    recordActivity: async (activityType: RequirementType, value: number): Promise<void> => {
+      return await recordActivity(activityType, value);
+    },
     clearError,
   };
   
