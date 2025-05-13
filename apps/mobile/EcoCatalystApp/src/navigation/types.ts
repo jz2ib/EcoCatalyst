@@ -12,7 +12,13 @@ export type AuthStackParamList = {
 export type MainTabParamList = {
   Home: undefined;
   Scanner: undefined;
+  ScannerMain: undefined;
   Footprint: undefined;
+  FootprintMain: undefined;
+  FootprintAnalytics: undefined;
+  GoalSetting: undefined;
   Diet: undefined;
   Profile: undefined;
+  AlternativeProducts: { productId: string; productName: string };
+  AlternativeDetails: { alternativeId: string; originalProductId: string; alternative: any };
 };
