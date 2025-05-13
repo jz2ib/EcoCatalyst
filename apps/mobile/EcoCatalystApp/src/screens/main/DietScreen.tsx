@@ -1,38 +1,132 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView } from 'react-native';
+import React, { useState, useRef, useEffect } from 'react';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  TextInput, 
+  TouchableOpacity, 
+  ScrollView, 
+  ActivityIndicator,
+  Modal,
+  FlatList,
+  Image
+} from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
+import { useDiet, MealEntry, DietType } from '../../contexts/diet/DietContext';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { MainTabParamList } from '../../navigation/types';
+import MealPlanCard from '../../components/diet/MealPlanCard';
+import MealSuggestionCard from '../../components/diet/MealSuggestionCard';
+import DietPlanModal from '../../components/diet/DietPlanModal';
 
 const DietScreen: React.FC = () => {
+  const { 
+    chatHistory, 
+    currentPlan, 
+    mealEntries, 
+    isLoading, 
+    error, 
+    sendChatMessage, 
+    generateMealSuggestion,
+    createAIDietPlan
+  } = useDiet();
+  
   const [message, setMessage] = useState('');
-  const [chatHistory, setChatHistory] = useState([
-    { id: 1, text: 'Hello! I\'m your EcoDiet assistant. How can I help you with sustainable food choices today?', isUser: false },
-  ]);
-
-  const sendMessage = () => {
+  const [showDietPlanModal, setShowDietPlanModal] = useState(false);
+  const [showMealSuggestion, setShowMealSuggestion] = useState(false);
+  const [suggestedMeal, setSuggestedMeal] = useState<MealEntry | null>(null);
+  const [dietPlanOptions, setDietPlanOptions] = useState<{
+    dietType: string;
+    durationDays: number;
+    restrictions: string[];
+    preferences: string[];
+  }>({
+    dietType: 'balanced',
+    durationDays: 7,
+    restrictions: [],
+    preferences: []
+  });
+  
+  const scrollViewRef = useRef<ScrollView>(null);
+  const navigation = useNavigation<NativeStackNavigationProp<MainTabParamList>>();
+  
+  useEffect(() => {
+    if (scrollViewRef.current) {
+      scrollViewRef.current.scrollToEnd({ animated: true });
+    }
+  }, [chatHistory]);
+  
+  const handleSendMessage = async () => {
     if (message.trim() === '') return;
     
-    const newUserMessage = { id: chatHistory.length + 1, text: message, isUser: true };
-    setChatHistory([...chatHistory, newUserMessage]);
-    
+    await sendChatMessage(message);
     setMessage('');
     
-    setTimeout(() => {
-      let response = '';
-      
-      if (message.toLowerCase().includes('vegetarian')) {
-        response = 'A vegetarian diet can reduce your carbon footprint by up to 30% compared to a meat-heavy diet. Would you like some vegetarian meal suggestions?';
-      } else if (message.toLowerCase().includes('meal plan') || message.toLowerCase().includes('diet plan')) {
-        response = 'I can help you create a sustainable meal plan. What are your dietary preferences and restrictions?';
-      } else if (message.toLowerCase().includes('carbon footprint') || message.toLowerCase().includes('environmental impact')) {
-        response = 'Food production accounts for about 25% of global greenhouse gas emissions. Choosing local, plant-based foods can significantly reduce your environmental impact.';
-      } else {
-        response = 'I\'m here to help you make sustainable food choices. You can ask me about eco-friendly diets, meal plans, or the environmental impact of different foods.';
-      }
-      
-      const newAiMessage = { id: chatHistory.length + 2, text: response, isUser: false };
-      setChatHistory([...chatHistory, newUserMessage, newAiMessage]);
-    }, 1000);
+    if (message.toLowerCase().includes('suggest meal') || 
+        message.toLowerCase().includes('meal suggestion') ||
+        message.toLowerCase().includes('what should i eat')) {
+      handleMealSuggestion();
+    }
+    
+    if (message.toLowerCase().includes('create diet plan') || 
+        message.toLowerCase().includes('make meal plan') ||
+        message.toLowerCase().includes('plan my diet')) {
+      setShowDietPlanModal(true);
+    }
   };
-
+  
+  const handleMealSuggestion = async () => {
+    const today = new Date().toISOString().split('T')[0];
+    const meal = await generateMealSuggestion('lunch', today, 'balanced');
+    
+    if (meal) {
+      setSuggestedMeal(meal);
+      setShowMealSuggestion(true);
+    }
+  };
+  
+  const handleCreateDietPlan = async () => {
+    const { dietType, durationDays, restrictions, preferences } = dietPlanOptions;
+    
+    const plan = await createAIDietPlan(
+      dietType as DietType,
+      durationDays,
+      restrictions,
+      preferences
+    );
+    
+    setShowDietPlanModal(false);
+    
+    if (plan) {
+      await sendChatMessage(`I've created a new ${dietType} diet plan for you called "${plan.name}". It includes meal suggestions for ${durationDays} days with a focus on sustainability.`);
+    }
+  };
+  
+  const renderChatMessage = (message) => {
+    const isUser = message.sender === 'user';
+    
+    return (
+      <View 
+        key={message.id} 
+        style={[
+          styles.messageBubble, 
+          isUser ? styles.userMessage : styles.aiMessage
+        ]}
+      >
+        <Text style={styles.messageText}>{message.content}</Text>
+        {!isUser && message.content.includes('carbon footprint') && (
+          <TouchableOpacity 
+            style={styles.actionButton}
+            onPress={() => navigation.navigate('Footprint')}
+          >
+            <Text style={styles.actionButtonText}>View Carbon Footprint</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    );
+  };
+  
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -40,19 +134,47 @@ const DietScreen: React.FC = () => {
         <Text style={styles.subtitle}>AI-powered sustainable diet planning</Text>
       </View>
       
-      <ScrollView style={styles.chatContainer}>
-        {chatHistory.map((msg) => (
-          <View 
-            key={msg.id} 
-            style={[
-              styles.messageBubble, 
-              msg.isUser ? styles.userMessage : styles.aiMessage
-            ]}
-          >
-            <Text style={styles.messageText}>{msg.text}</Text>
+      {currentPlan && (
+        <MealPlanCard plan={currentPlan} />
+      )}
+      
+      <ScrollView 
+        style={styles.chatContainer}
+        ref={scrollViewRef}
+      >
+        {chatHistory.map(renderChatMessage)}
+        {isLoading && (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="small" color="#4CAF50" />
           </View>
-        ))}
+        )}
       </ScrollView>
+      
+      <View style={styles.actionBar}>
+        <TouchableOpacity 
+          style={styles.actionIcon}
+          onPress={() => setShowDietPlanModal(true)}
+        >
+          <MaterialIcons name="restaurant-menu" size={24} color="#4CAF50" />
+          <Text style={styles.actionText}>Diet Plan</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={styles.actionIcon}
+          onPress={handleMealSuggestion}
+        >
+          <MaterialIcons name="lightbulb" size={24} color="#4CAF50" />
+          <Text style={styles.actionText}>Suggest Meal</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={styles.actionIcon}
+          onPress={() => navigation.navigate('Footprint')}
+        >
+          <MaterialIcons name="eco" size={24} color="#4CAF50" />
+          <Text style={styles.actionText}>Footprint</Text>
+        </TouchableOpacity>
+      </View>
       
       <View style={styles.inputContainer}>
         <TextInput
@@ -63,10 +185,62 @@ const DietScreen: React.FC = () => {
           placeholderTextColor="#999"
           multiline
         />
-        <TouchableOpacity style={styles.sendButton} onPress={sendMessage}>
-          <Text style={styles.sendButtonText}>Send</Text>
+        <TouchableOpacity 
+          style={styles.sendButton} 
+          onPress={handleSendMessage}
+          disabled={isLoading}
+        >
+          <MaterialIcons name="send" size={24} color="white" />
         </TouchableOpacity>
       </View>
+      
+      {/* Diet Plan Modal */}
+      <DietPlanModal
+        visible={showDietPlanModal}
+        options={dietPlanOptions}
+        setOptions={setDietPlanOptions}
+        onClose={() => setShowDietPlanModal(false)}
+        onSubmit={handleCreateDietPlan}
+        isLoading={isLoading}
+      />
+      
+      {/* Meal Suggestion Modal */}
+      {suggestedMeal && (
+        <Modal
+          visible={showMealSuggestion}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={() => setShowMealSuggestion(false)}
+        >
+          <View style={styles.modalContainer}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Suggested Meal</Text>
+                <TouchableOpacity onPress={() => setShowMealSuggestion(false)}>
+                  <MaterialIcons name="close" size={24} color="#333" />
+                </TouchableOpacity>
+              </View>
+              
+              <MealSuggestionCard meal={suggestedMeal} />
+              
+              <View style={styles.modalActions}>
+                <TouchableOpacity 
+                  style={styles.modalButton}
+                  onPress={() => setShowMealSuggestion(false)}
+                >
+                  <Text style={styles.modalButtonText}>Close</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
+      
+      {error && (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
+      )}
     </View>
   );
 };
@@ -115,6 +289,40 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#333',
   },
+  actionButton: {
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    marginTop: 8,
+    alignSelf: 'flex-start',
+  },
+  actionButtonText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  loadingContainer: {
+    padding: 10,
+    alignItems: 'center',
+  },
+  actionBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    padding: 10,
+    backgroundColor: '#F9F9F9',
+    borderTopWidth: 1,
+    borderTopColor: '#E0E0E0',
+  },
+  actionIcon: {
+    alignItems: 'center',
+    padding: 8,
+  },
+  actionText: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 4,
+  },
   inputContainer: {
     flexDirection: 'row',
     padding: 10,
@@ -142,6 +350,55 @@ const styles = StyleSheet.create({
   sendButtonText: {
     color: 'white',
     fontWeight: 'bold',
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    borderRadius: 20,
+    padding: 20,
+    width: '90%',
+    maxHeight: '80%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: 20,
+  },
+  modalButton: {
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  modalButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  errorContainer: {
+    backgroundColor: '#FFEBEE',
+    padding: 10,
+    margin: 10,
+    borderRadius: 8,
+  },
+  errorText: {
+    color: '#D32F2F',
+    textAlign: 'center',
   },
 });
 
