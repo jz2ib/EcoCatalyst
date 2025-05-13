@@ -54,4 +54,4 @@ jest.mock('react-native/Libraries/Animated/NativeAnimatedHelper', () => ({
     shouldUseNativeDriver: () => false,
     API: {},
   },
-}));
+}), { virtual: true });
