@@ -1,8 +1,11 @@
-import React, { createContext, useState, useEffect, useContext } from 'react';
+import React, { createContext, useState, useEffect, useContext, useCallback, useMemo } from 'react';
 import { database } from '../../services/firebase';
 import { ref, onValue, set, push, remove, get, query, orderByChild, limitToLast, equalTo } from 'firebase/database';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AuthContext } from '../AuthContext';
+import performanceOptimizer from '../../services/performanceOptimizer';
+import errorHandler, { ErrorType, ErrorSeverity } from '../../services/errorHandling';
+import networkManager, { NetworkEvent } from '../../services/networkManager';
 
 export interface Achievement {
   id: string;
@@ -441,13 +444,17 @@ export const GamificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
   };
   
-  const getAchievementById = (id: string): Achievement | null => {
-    return achievements.find(a => a.id === id) || null;
-  };
+  const getAchievementById = useMemo(() => 
+    performanceOptimizer.memoize((id: string): Achievement | null => {
+      return achievements.find(a => a.id === id) || null;
+    }),
+  [achievements]);
   
-  const getAchievementsByCategory = (category: AchievementCategory): Achievement[] => {
-    return achievements.filter(a => a.category === category);
-  };
+  const getAchievementsByCategory = useMemo(() => 
+    performanceOptimizer.memoize((category: AchievementCategory): Achievement[] => {
+      return achievements.filter(a => a.category === category);
+    }),
+  [achievements]);
   
   const getCompletedAchievements = (): UserAchievement[] => {
     return userAchievements.filter(ua => ua.progress === 100);
@@ -502,32 +509,47 @@ export const GamificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
   };
   
-  const recordActivity = async (activityType: RequirementType, value: number): Promise<void> => {
-    try {
-      if (!user || !userStats) return;
-      
-      const updates: Partial<Omit<UserStats, 'id' | 'userId' | 'updatedAt'>> = {
-        lastActive: Date.now()
-      };
-      
-      switch (activityType) {
-        case 'scan_products':
-          updates.productsScanned = (userStats.productsScanned || 0) + value;
-          break;
-        case 'use_alternatives':
-          updates.ecoAlternativesUsed = (userStats.ecoAlternativesUsed || 0) + value;
-          break;
-        case 'reduce_carbon':
-          updates.carbonSaved = (userStats.carbonSaved || 0) + value;
-          break;
+  const recordActivity = useCallback(
+    performanceOptimizer.throttle(async (activityType: RequirementType, value: number): Promise<void> => {
+      try {
+        if (!user || !userStats) return;
+        
+        const updates: Partial<Omit<UserStats, 'id' | 'userId' | 'updatedAt'>> = {
+          lastActive: Date.now()
+        };
+        
+        switch (activityType) {
+          case 'scan_products':
+            updates.productsScanned = (userStats.productsScanned || 0) + value;
+            break;
+          case 'use_alternatives':
+            updates.ecoAlternativesUsed = (userStats.ecoAlternativesUsed || 0) + value;
+            break;
+          case 'reduce_carbon':
+            updates.carbonSaved = (userStats.carbonSaved || 0) + value;
+            break;
+        }
+        
+        if (!networkManager.isConnected()) {
+          networkManager.enqueueRequest(
+            `recordActivity_${Date.now()}`,
+            async () => updateUserStats(updates)
+          );
+          return;
+        }
+        
+        await updateUserStats(updates);
+      } catch (error) {
+        errorHandler.handleError(
+          error instanceof Error ? error : String(error),
+          ErrorType.UNKNOWN,
+          ErrorSeverity.MEDIUM,
+          { method: 'recordActivity', activityType, value }
+        );
       }
-      
-      await updateUserStats(updates);
-    } catch (error) {
-      console.error('Error recording activity:', error);
-      setError('Failed to record activity. Please try again.');
-    }
-  };
+    }, 300),
+    [user, userStats, updateUserStats]
+  );
   
   const clearError = () => {
     setError(null);
