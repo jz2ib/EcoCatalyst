@@ -1,4 +1,4 @@
-import '@testing-library/jest-native/extend-expect';
+import '@testing-library/react-native';
 
 jest.mock('expo-status-bar', () => ({
   StatusBar: () => 'StatusBar',
@@ -54,4 +54,4 @@ jest.mock('react-native/Libraries/Animated/NativeAnimatedHelper', () => ({
     shouldUseNativeDriver: () => false,
     API: {},
   },
-}));
+}), { virtual: true });

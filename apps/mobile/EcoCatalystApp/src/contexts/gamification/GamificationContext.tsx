@@ -1,8 +1,11 @@
-import React, { createContext, useState, useEffect, useContext } from 'react';
+import React, { createContext, useState, useEffect, useContext, useCallback, useMemo } from 'react';
 import { database } from '../../services/firebase';
 import { ref, onValue, set, push, remove, get, query, orderByChild, limitToLast, equalTo } from 'firebase/database';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AuthContext } from '../AuthContext';
+import performanceOptimizer from '../../services/performanceOptimizer';
+import errorHandler, { ErrorType, ErrorSeverity } from '../../services/errorHandling';
+import networkManager, { NetworkEvent } from '../../services/networkManager';
 
 export interface Achievement {
   id: string;
@@ -441,99 +444,136 @@ export const GamificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
   };
   
-  const getAchievementById = (id: string): Achievement | null => {
-    return achievements.find(a => a.id === id) || null;
-  };
+  const getAchievementById = useMemo(() => 
+    performanceOptimizer.memoize((id: string): Achievement | null => {
+      return achievements.find(a => a.id === id) || null;
+    }),
+  [achievements]);
   
-  const getAchievementsByCategory = (category: AchievementCategory): Achievement[] => {
-    return achievements.filter(a => a.category === category);
-  };
+  const getAchievementsByCategory = useMemo(() => 
+    performanceOptimizer.memoize((category: AchievementCategory): Achievement[] => {
+      return achievements.filter(a => a.category === category);
+    }),
+  [achievements]);
   
-  const getCompletedAchievements = (): UserAchievement[] => {
-    return userAchievements.filter(ua => ua.progress === 100);
-  };
+  const getCompletedAchievements = useMemo(() => 
+    performanceOptimizer.memoize((): UserAchievement[] => {
+      return userAchievements.filter(ua => ua.progress === 100);
+    }),
+  [userAchievements]);
   
-  const getInProgressAchievements = (): { achievement: Achievement; userAchievement: UserAchievement }[] => {
-    return userAchievements
-      .filter(ua => ua.progress > 0 && ua.progress < 100)
-      .map(ua => {
-        const achievement = getAchievementById(ua.achievementId);
-        if (!achievement) return null;
-        return { achievement, userAchievement: ua };
-      })
-      .filter((item): item is { achievement: Achievement; userAchievement: UserAchievement } => item !== null);
-  };
+  const getInProgressAchievements = useMemo(() => 
+    performanceOptimizer.memoize((): { achievement: Achievement; userAchievement: UserAchievement }[] => {
+      return userAchievements
+        .filter(ua => ua.progress > 0 && ua.progress < 100)
+        .map(ua => {
+          const achievement = getAchievementById(ua.achievementId);
+          if (!achievement) return null;
+          return { achievement, userAchievement: ua };
+        })
+        .filter((item): item is { achievement: Achievement; userAchievement: UserAchievement } => item !== null);
+    }),
+  [userAchievements, getAchievementById]);
   
-  const getLeaderboard = async (limit: number = 10): Promise<LeaderboardEntry[]> => {
-    try {
-      if (leaderboard.length > 0 && limit <= leaderboard.length) {
-        return leaderboard.slice(0, limit);
-      }
-      
-      const leaderboardRef = query(
-        ref(database, 'userStats'),
-        orderByChild('totalPoints'),
-        limitToLast(limit)
-      );
-      
-      const snapshot = await get(leaderboardRef);
-      const data = snapshot.val();
-      
-      if (data) {
-        const entries = Object.keys(data).map(key => ({
-          userId: key,
-          displayName: data[key].displayName || 'Anonymous',
-          photoURL: data[key].photoURL,
-          totalPoints: data[key].totalPoints || 0,
-          level: data[key].level || 1
-        }));
+  const getLeaderboard = useCallback(
+    async (limit: number = 10): Promise<LeaderboardEntry[]> => {
+      try {
+        if (leaderboard.length > 0 && limit <= leaderboard.length) {
+          return leaderboard.slice(0, limit);
+        }
         
-        entries.sort((a, b) => b.totalPoints - a.totalPoints);
+        if (!networkManager.isConnected()) {
+          return leaderboard;
+        }
         
-        setLeaderboard(entries);
-        return entries;
+        const leaderboardRef = query(
+          ref(database, 'userStats'),
+          orderByChild('totalPoints'),
+          limitToLast(limit)
+        );
+        
+        const snapshot = await get(leaderboardRef);
+        const data = snapshot.val();
+        
+        if (data) {
+          const entries = Object.keys(data).map(key => ({
+            userId: key,
+            displayName: data[key].displayName || 'Anonymous',
+            photoURL: data[key].photoURL,
+            totalPoints: data[key].totalPoints || 0,
+            level: data[key].level || 1
+          }));
+          
+          entries.sort((a, b) => b.totalPoints - a.totalPoints);
+          
+          performanceOptimizer.runAfterInteractions(() => {
+            setLeaderboard(entries);
+          });
+          
+          return entries;
+        }
+        
+        return [];
+      } catch (error) {
+        errorHandler.handleError(
+          error instanceof Error ? error : String(error),
+          ErrorType.UNKNOWN,
+          ErrorSeverity.MEDIUM,
+          { method: 'getLeaderboard', limit }
+        );
+        return [];
       }
-      
-      return [];
-    } catch (error) {
-      console.error('Error getting leaderboard:', error);
-      setError('Failed to get leaderboard. Please try again.');
-      return [];
-    }
-  };
+    },
+    [leaderboard]
+  );
   
-  const recordActivity = async (activityType: RequirementType, value: number): Promise<void> => {
-    try {
-      if (!user || !userStats) return;
-      
-      const updates: Partial<Omit<UserStats, 'id' | 'userId' | 'updatedAt'>> = {
-        lastActive: Date.now()
-      };
-      
-      switch (activityType) {
-        case 'scan_products':
-          updates.productsScanned = (userStats.productsScanned || 0) + value;
-          break;
-        case 'use_alternatives':
-          updates.ecoAlternativesUsed = (userStats.ecoAlternativesUsed || 0) + value;
-          break;
-        case 'reduce_carbon':
-          updates.carbonSaved = (userStats.carbonSaved || 0) + value;
-          break;
+  const recordActivity = useCallback(
+    performanceOptimizer.throttle(async (activityType: RequirementType, value: number): Promise<void> => {
+      try {
+        if (!user || !userStats) return;
+        
+        const updates: Partial<Omit<UserStats, 'id' | 'userId' | 'updatedAt'>> = {
+          lastActive: Date.now()
+        };
+        
+        switch (activityType) {
+          case 'scan_products':
+            updates.productsScanned = (userStats.productsScanned || 0) + value;
+            break;
+          case 'use_alternatives':
+            updates.ecoAlternativesUsed = (userStats.ecoAlternativesUsed || 0) + value;
+            break;
+          case 'reduce_carbon':
+            updates.carbonSaved = (userStats.carbonSaved || 0) + value;
+            break;
+        }
+        
+        if (!networkManager.isConnected()) {
+          networkManager.enqueueRequest(
+            `recordActivity_${Date.now()}`,
+            async () => updateUserStats(updates)
+          );
+          return;
+        }
+        
+        await updateUserStats(updates);
+      } catch (error) {
+        errorHandler.handleError(
+          error instanceof Error ? error : String(error),
+          ErrorType.UNKNOWN,
+          ErrorSeverity.MEDIUM,
+          { method: 'recordActivity', activityType, value }
+        );
       }
-      
-      await updateUserStats(updates);
-    } catch (error) {
-      console.error('Error recording activity:', error);
-      setError('Failed to record activity. Please try again.');
-    }
-  };
+    }, 300),
+    [user, userStats, updateUserStats]
+  );
   
   const clearError = () => {
     setError(null);
   };
   
-  const value = {
+  const value: GamificationContextType = {
     achievements,
     userAchievements,
     userStats,
@@ -542,12 +582,14 @@ export const GamificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     error,
     checkAchievements,
     updateUserStats,
-    getAchievementById,
-    getAchievementsByCategory,
-    getCompletedAchievements,
-    getInProgressAchievements,
+    getAchievementById: (id: string) => getAchievementById(id),
+    getAchievementsByCategory: (category: AchievementCategory) => getAchievementsByCategory(category),
+    getCompletedAchievements: () => getCompletedAchievements(),
+    getInProgressAchievements: () => getInProgressAchievements(),
     getLeaderboard,
-    recordActivity,
+    recordActivity: async (activityType: RequirementType, value: number): Promise<void> => {
+      return await recordActivity(activityType, value);
+    },
     clearError,
   };
   
