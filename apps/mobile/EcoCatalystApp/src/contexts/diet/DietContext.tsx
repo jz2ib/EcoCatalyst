@@ -4,6 +4,8 @@ import { ref, onValue, set, push, remove, get, query, orderByChild, limitToLast,
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AuthContext } from '../AuthContext';
 import { usePreferences } from '../preferences/PreferencesContext';
+import { generateDietResponse, generateMealSuggestion as generateAIMealSuggestion, generateDietPlan } from '../../services/openai';
+import { getNutritionInfo } from '../../services/nutritionDatabase';
 
 export interface DietPlan {
   id: string;
@@ -96,7 +98,19 @@ interface DietContextType {
   getMealsByDateRange: (startDate: string, endDate: string) => Promise<MealEntry[]>;
   sendChatMessage: (content: string, relatedTo?: { type: 'meal' | 'plan' | 'food'; id: string }) => Promise<void>;
   clearChatHistory: () => Promise<void>;
-  generateMealSuggestion: (mealType: MealType, date: string) => Promise<MealEntry | null>;
+  generateMealSuggestion: (
+    mealType: MealType, 
+    date: string,
+    dietType?: DietType,
+    restrictions?: string[], 
+    preferences?: string[]
+  ) => Promise<MealEntry | null>;
+  createAIDietPlan: (
+    dietType: DietType,
+    durationDays: number,
+    restrictions?: string[],
+    preferences?: string[]
+  ) => Promise<DietPlan | null>;
   clearError: () => void;
 }
 
@@ -121,6 +135,7 @@ export const DietContext = createContext<DietContextType>({
   sendChatMessage: async () => {},
   clearChatHistory: async () => {},
   generateMealSuggestion: async () => null,
+  createAIDietPlan: async () => null,
   clearError: () => {},
 });
 
@@ -511,10 +526,17 @@ export const DietProvider: React.FC<{ children: React.ReactNode }> = ({ children
         });
       }
       
+      const formattedChatHistory = chatHistory.map(msg => ({
+        content: msg.content,
+        sender: msg.sender
+      }));
+      
+      const aiResponseContent = await generateDietResponse(content, formattedChatHistory);
+      
       const aiResponse: ChatMessage = {
         id: `ai_${timestamp + 1}`,
         userId: user?.uid || 'anonymous',
-        content: 'I understand your request about diet planning. This AI feature will be implemented in a future update.',
+        content: aiResponseContent,
         sender: 'ai',
         timestamp: timestamp + 1,
         relatedTo
@@ -558,34 +580,39 @@ export const DietProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
   
-  const generateMealSuggestion = async (mealType: MealType, date: string): Promise<MealEntry | null> => {
+  const generateMealSuggestion = async (
+    mealType: MealType, 
+    date: string,
+    dietType: DietType = 'balanced',
+    restrictions: string[] = [], 
+    preferences: string[] = []
+  ): Promise<MealEntry | null> => {
     try {
-      
       const timestamp = Date.now();
       const mealId = `suggestion_${timestamp}`;
+      
+      const aiSuggestion = await generateAIMealSuggestion(
+        mealType,
+        dietType,
+        restrictions,
+        preferences
+      );
       
       const suggestion: MealEntry = {
         id: mealId,
         userId: user?.uid || 'anonymous',
         date,
         mealType,
-        name: `Suggested ${mealType}`,
-        foods: [
-          {
-            id: 'food1',
-            name: 'Placeholder Food Item',
-            servingSize: '100g',
-            calories: 200,
-            protein: 10,
-            carbs: 20,
-            fat: 5,
-            sustainabilityScore: 80
-          }
-        ],
-        totalCalories: 200,
-        totalProtein: 10,
-        totalCarbs: 20,
-        totalFat: 5,
+        name: aiSuggestion.name,
+        description: aiSuggestion.description,
+        foods: aiSuggestion.foods.map(food => ({
+          ...food,
+          id: food.id || `food_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
+        })),
+        totalCalories: aiSuggestion.totalCalories,
+        totalProtein: aiSuggestion.totalProtein,
+        totalCarbs: aiSuggestion.totalCarbs,
+        totalFat: aiSuggestion.totalFat,
         createdAt: timestamp,
         updatedAt: timestamp
       };
@@ -594,6 +621,100 @@ export const DietProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (error) {
       console.error('Error generating meal suggestion:', error);
       setError('Failed to generate meal suggestion. Please try again.');
+      return null;
+    }
+  };
+  
+  const createAIDietPlan = async (
+    dietType: DietType,
+    durationDays: number,
+    restrictions: string[] = [],
+    preferences: string[] = []
+  ): Promise<DietPlan | null> => {
+    try {
+      const timestamp = Date.now();
+      
+      const aiPlan = await generateDietPlan(
+        dietType,
+        durationDays,
+        restrictions,
+        preferences
+      );
+      
+      const newPlan: DietPlan = {
+        id: `plan_${timestamp}`,
+        userId: user?.uid || 'anonymous',
+        name: aiPlan.name,
+        description: aiPlan.description,
+        dietType,
+        startDate: new Date().toISOString().split('T')[0],
+        endDate: new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        calorieTarget: 2000, // Default value, can be adjusted based on user profile
+        proteinTarget: 100,
+        carbTarget: 250,
+        fatTarget: 70,
+        restrictions,
+        preferences,
+        createdAt: timestamp,
+        updatedAt: timestamp
+      };
+      
+      if (user) {
+        const userDietPlanRef = ref(database, `dietPlans/${user.uid}`);
+        const newPlanRef = push(userDietPlanRef);
+        
+        const planData: Omit<DietPlan, 'id'> = {
+          userId: user.uid,
+          name: newPlan.name,
+          description: newPlan.description,
+          dietType: newPlan.dietType,
+          startDate: newPlan.startDate,
+          endDate: newPlan.endDate,
+          calorieTarget: newPlan.calorieTarget,
+          proteinTarget: newPlan.proteinTarget,
+          carbTarget: newPlan.carbTarget,
+          fatTarget: newPlan.fatTarget,
+          restrictions: newPlan.restrictions,
+          preferences: newPlan.preferences,
+          createdAt: newPlan.createdAt,
+          updatedAt: newPlan.updatedAt
+        };
+        
+        await set(newPlanRef, planData);
+        
+        for (const day of aiPlan.mealPlan) {
+          const dayDate = new Date();
+          dayDate.setDate(dayDate.getDate() + day.day - 1);
+          const dateString = dayDate.toISOString().split('T')[0];
+          
+          for (const meal of day.meals) {
+            const mealEntry: Omit<MealEntry, 'id' | 'userId' | 'createdAt' | 'updatedAt'> = {
+              dietPlanId: newPlanRef.key!,
+              date: dateString,
+              mealType: meal.mealType,
+              name: meal.name,
+              description: meal.description,
+              foods: meal.foods,
+              totalCalories: meal.foods.reduce((sum, food) => sum + food.calories, 0),
+              totalProtein: meal.foods.reduce((sum, food) => sum + food.protein, 0),
+              totalCarbs: meal.foods.reduce((sum, food) => sum + food.carbs, 0),
+              totalFat: meal.foods.reduce((sum, food) => sum + food.fat, 0)
+            };
+            
+            await addMealEntry(mealEntry);
+          }
+        }
+        
+        return {
+          id: newPlanRef.key!,
+          ...planData
+        };
+      }
+      
+      return newPlan;
+    } catch (error) {
+      console.error('Error creating AI diet plan:', error);
+      setError('Failed to create diet plan. Please try again.');
       return null;
     }
   };
@@ -619,6 +740,7 @@ export const DietProvider: React.FC<{ children: React.ReactNode }> = ({ children
     sendChatMessage,
     clearChatHistory,
     generateMealSuggestion,
+    createAIDietPlan,
     clearError,
   };
   
