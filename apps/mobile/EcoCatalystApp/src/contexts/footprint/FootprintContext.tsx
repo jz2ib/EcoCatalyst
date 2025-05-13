@@ -38,8 +38,23 @@ export interface FootprintSummary {
   averagePerDay: number;
 }
 
+export interface CarbonGoal {
+  id: string;
+  userId: string;
+  title: string;
+  description: string;
+  targetAmount: number;
+  currentAmount: number;
+  deadline: string; // ISO date string
+  category: FootprintCategory | 'all';
+  isCompleted: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
 interface FootprintContextType {
   entries: CarbonFootprintEntry[];
+  goals: CarbonGoal[];
   summary: FootprintSummary;
   isLoading: boolean;
   error: string | null;
@@ -49,10 +64,14 @@ interface FootprintContextType {
   getFootprintByDateRange: (startDate: string, endDate: string) => Promise<CarbonFootprintEntry[]>;
   getFootprintByCategory: (category: FootprintCategory) => CarbonFootprintEntry[];
   calculateSummary: () => FootprintSummary;
+  addGoal: (goal: Omit<CarbonGoal, 'id' | 'userId' | 'createdAt' | 'updatedAt' | 'isCompleted'>) => Promise<void>;
+  updateGoal: (id: string, updates: Partial<Omit<CarbonGoal, 'id' | 'userId'>>) => Promise<void>;
+  deleteGoal: (id: string) => Promise<void>;
   clearError: () => void;
 }
 
 const FOOTPRINT_ENTRIES_STORAGE_KEY = 'ecocatalyst_footprint_entries';
+const FOOTPRINT_GOALS_STORAGE_KEY = 'ecocatalyst_footprint_goals';
 
 const defaultSummary: FootprintSummary = {
   daily: 0,
@@ -73,6 +92,7 @@ const defaultSummary: FootprintSummary = {
 
 export const FootprintContext = createContext<FootprintContextType>({
   entries: [],
+  goals: [],
   summary: defaultSummary,
   isLoading: true,
   error: null,
@@ -82,6 +102,9 @@ export const FootprintContext = createContext<FootprintContextType>({
   getFootprintByDateRange: async () => [],
   getFootprintByCategory: () => [],
   calculateSummary: () => defaultSummary,
+  addGoal: async () => {},
+  updateGoal: async () => {},
+  deleteGoal: async () => {},
   clearError: () => {},
 });
 
@@ -89,6 +112,7 @@ export const useFootprint = () => useContext(FootprintContext);
 
 export const FootprintProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [entries, setEntries] = useState<CarbonFootprintEntry[]>([]);
+  const [goals, setGoals] = useState<CarbonGoal[]>([]);
   const [summary, setSummary] = useState<FootprintSummary>(defaultSummary);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -106,6 +130,12 @@ export const FootprintProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           
           const calculatedSummary = calculateSummaryFromEntries(parsedEntries);
           setSummary(calculatedSummary);
+        }
+        
+        const cachedGoals = await AsyncStorage.getItem(FOOTPRINT_GOALS_STORAGE_KEY);
+        if (cachedGoals) {
+          const parsedGoals = JSON.parse(cachedGoals);
+          setGoals(parsedGoals);
         }
       } catch (error) {
         console.error('Failed to load cached footprint data:', error);
@@ -126,7 +156,9 @@ export const FootprintProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setIsLoading(true);
     
     const userFootprintRef = ref(database, `footprints/${user.uid}`);
-    const unsubscribe = onValue(userFootprintRef, (snapshot) => {
+    const userGoalsRef = ref(database, `goals/${user.uid}`);
+    
+    const entriesUnsubscribe = onValue(userFootprintRef, (snapshot) => {
       try {
         const data = snapshot.val();
         if (data) {
@@ -160,7 +192,34 @@ export const FootprintProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setIsLoading(false);
     });
     
-    return () => unsubscribe();
+    const goalsUnsubscribe = onValue(userGoalsRef, (snapshot) => {
+      try {
+        const data = snapshot.val();
+        if (data) {
+          const goalsList = Object.keys(data).map(key => ({
+            id: key,
+            ...data[key]
+          }));
+          
+          goalsList.sort((a, b) => b.createdAt - a.createdAt);
+          
+          setGoals(goalsList);
+          
+          AsyncStorage.setItem(FOOTPRINT_GOALS_STORAGE_KEY, JSON.stringify(goalsList))
+            .catch(err => console.error('Failed to cache footprint goals:', err));
+        } else {
+          setGoals([]);
+        }
+      } catch (error) {
+        console.error('Error fetching goals:', error);
+        setError('Failed to fetch goals data. Please try again later.');
+      }
+    });
+    
+    return () => {
+      entriesUnsubscribe();
+      goalsUnsubscribe();
+    };
   }, [user]);
   
   const calculateSummaryFromEntries = (entriesList: CarbonFootprintEntry[]): FootprintSummary => {
@@ -339,12 +398,104 @@ export const FootprintProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     return calculateSummaryFromEntries(entries);
   };
   
+  const addGoal = async (goal: Omit<CarbonGoal, 'id' | 'userId' | 'createdAt' | 'updatedAt' | 'isCompleted'>): Promise<void> => {
+    try {
+      const timestamp = Date.now();
+      
+      if (!user) {
+        const newGoal: CarbonGoal = {
+          id: `local_${timestamp}`,
+          userId: 'anonymous',
+          createdAt: timestamp,
+          updatedAt: timestamp,
+          isCompleted: false,
+          ...goal
+        };
+        
+        const updatedGoals = [newGoal, ...goals];
+        setGoals(updatedGoals);
+        
+        await AsyncStorage.setItem(FOOTPRINT_GOALS_STORAGE_KEY, JSON.stringify(updatedGoals));
+        return;
+      }
+      
+      const userGoalsRef = ref(database, `goals/${user.uid}`);
+      const newGoalRef = push(userGoalsRef);
+      
+      const goalData: Omit<CarbonGoal, 'id'> = {
+        userId: user.uid,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        isCompleted: false,
+        ...goal
+      };
+      
+      await set(newGoalRef, goalData);
+    } catch (error) {
+      console.error('Error adding goal:', error);
+      setError('Failed to save goal. Please try again.');
+    }
+  };
+  
+  const updateGoal = async (id: string, updates: Partial<Omit<CarbonGoal, 'id' | 'userId'>>): Promise<void> => {
+    try {
+      if (!user) {
+        const updatedGoals = goals.map(goal => 
+          goal.id === id ? { ...goal, ...updates, updatedAt: Date.now() } : goal
+        );
+        
+        setGoals(updatedGoals);
+        
+        await AsyncStorage.setItem(FOOTPRINT_GOALS_STORAGE_KEY, JSON.stringify(updatedGoals));
+        return;
+      }
+      
+      const goalRef = ref(database, `goals/${user.uid}/${id}`);
+      
+      const snapshot = await get(goalRef);
+      const currentData = snapshot.val();
+      
+      if (!currentData) {
+        throw new Error('Goal not found');
+      }
+      
+      await set(goalRef, {
+        ...currentData,
+        ...updates,
+        updatedAt: Date.now()
+      });
+    } catch (error) {
+      console.error('Error updating goal:', error);
+      setError('Failed to update goal. Please try again.');
+    }
+  };
+  
+  const deleteGoal = async (id: string): Promise<void> => {
+    try {
+      if (!user) {
+        const updatedGoals = goals.filter(goal => goal.id !== id);
+        
+        setGoals(updatedGoals);
+        
+        await AsyncStorage.setItem(FOOTPRINT_GOALS_STORAGE_KEY, JSON.stringify(updatedGoals));
+        return;
+      }
+      
+      const goalRef = ref(database, `goals/${user.uid}/${id}`);
+      await remove(goalRef);
+    } catch (error) {
+      console.error('Error deleting goal:', error);
+      setError('Failed to delete goal. Please try again.');
+    }
+  };
+  
   const clearError = () => {
     setError(null);
   };
   
   const value = {
     entries,
+    goals,
     summary,
     isLoading,
     error,
@@ -354,6 +505,9 @@ export const FootprintProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     getFootprintByDateRange,
     getFootprintByCategory,
     calculateSummary,
+    addGoal,
+    updateGoal,
+    deleteGoal,
     clearError,
   };
   

@@ -7,6 +7,8 @@ import { MaterialIcons } from '@expo/vector-icons';
 import HomeScreen from '../screens/main/HomeScreen';
 import ScannerScreen from '../screens/main/ScannerScreen';
 import FootprintScreen from '../screens/main/FootprintScreen';
+import FootprintAnalyticsScreen from '../screens/main/FootprintAnalyticsScreen';
+import GoalSettingScreen from '../screens/main/GoalSettingScreen';
 import DietScreen from '../screens/main/DietScreen';
 import ProfileScreen from '../screens/main/ProfileScreen';
 import AlternativeProductsScreen from '../screens/main/AlternativeProductsScreen';
@@ -25,6 +27,20 @@ const ScannerStackNavigator = () => {
       <Stack.Screen name="ScannerMain" component={ScannerScreen} />
       <Stack.Screen name="AlternativeProducts" component={AlternativeProductsScreen} />
       <Stack.Screen name="AlternativeDetails" component={AlternativeDetailsScreen} />
+    </Stack.Navigator>
+  );
+};
+
+const FootprintStackNavigator = () => {
+  return (
+    <Stack.Navigator
+      screenOptions={{
+        headerShown: false,
+      }}
+    >
+      <Stack.Screen name="FootprintMain" component={FootprintScreen} />
+      <Stack.Screen name="FootprintAnalytics" component={FootprintAnalyticsScreen} />
+      <Stack.Screen name="GoalSetting" component={GoalSettingScreen} />
     </Stack.Navigator>
   );
 };
@@ -61,7 +77,7 @@ const MainNavigator = () => {
       />
       <Tab.Screen 
         name="Footprint" 
-        component={FootprintScreen} 
+        component={FootprintStackNavigator} 
         options={{
           tabBarLabel: 'Footprint',
           tabBarIcon: ({ color, size }) => (

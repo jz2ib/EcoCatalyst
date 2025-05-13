@@ -14,6 +14,9 @@ export type MainTabParamList = {
   Scanner: undefined;
   ScannerMain: undefined;
   Footprint: undefined;
+  FootprintMain: undefined;
+  FootprintAnalytics: undefined;
+  GoalSetting: undefined;
   Diet: undefined;
   Profile: undefined;
   AlternativeProducts: { productId: string; productName: string };
