@@ -86,7 +86,7 @@ const Button: React.FC<ButtonProps> = ({
   rightIcon,
   ...rest
 }) => {
-  const { theme } = useAppTheme();
+  const { theme, horizontalScale, verticalScale, moderateScale, fontScale } = useAppTheme();
   
   const getButtonStyles = () => {
     const baseStyles = {
@@ -119,21 +119,21 @@ const Button: React.FC<ButtonProps> = ({
     let sizeStyles = {};
     if (size === 'small') {
       sizeStyles = {
-        paddingVertical: theme.spacing.xs,
-        paddingHorizontal: theme.spacing.s,
-        minWidth: 64,
+        paddingVertical: verticalScale(theme.spacing.xs),
+        paddingHorizontal: horizontalScale(theme.spacing.s),
+        minWidth: horizontalScale(64),
       };
     } else if (size === 'medium') {
       sizeStyles = {
-        paddingVertical: theme.spacing.s,
-        paddingHorizontal: theme.spacing.m,
-        minWidth: 88,
+        paddingVertical: verticalScale(theme.spacing.s),
+        paddingHorizontal: horizontalScale(theme.spacing.m),
+        minWidth: horizontalScale(88),
       };
     } else if (size === 'large') {
       sizeStyles = {
-        paddingVertical: theme.spacing.m,
-        paddingHorizontal: theme.spacing.l,
-        minWidth: 120,
+        paddingVertical: verticalScale(theme.spacing.m),
+        paddingHorizontal: horizontalScale(theme.spacing.l),
+        minWidth: horizontalScale(120),
       };
     }
     
@@ -169,15 +169,15 @@ const Button: React.FC<ButtonProps> = ({
     let sizeStyles = {};
     if (size === 'small') {
       sizeStyles = {
-        fontSize: theme.typography.fontSize.caption,
+        fontSize: fontScale(theme.typography.fontSize.caption),
       };
     } else if (size === 'medium') {
       sizeStyles = {
-        fontSize: theme.typography.fontSize.button,
+        fontSize: fontScale(theme.typography.fontSize.button),
       };
     } else if (size === 'large') {
       sizeStyles = {
-        fontSize: theme.typography.fontSize.body1,
+        fontSize: fontScale(theme.typography.fontSize.body1),
       };
     }
     
@@ -206,6 +206,7 @@ const Button: React.FC<ButtonProps> = ({
     >
       {loading ? (
         <ActivityIndicator 
+          testID="button-loading-indicator"
           size="small" 
           color={variant === 'primary' ? theme.colors.onPrimary : theme.colors.primary} 
         />

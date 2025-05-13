@@ -8,48 +8,57 @@ declare const describe: (name: string, fn: () => void) => void;
 declare const it: (name: string, fn: () => void) => void;
 declare const expect: any;
 
-jest.mock('../../../theme/ThemeProvider', () => ({
-  useAppTheme: jest.fn(() => ({
-    theme: {
-      colors: {
-        primary: '#4CAF50',
-        secondary: '#2196F3',
-        error: '#F44336',
-        surface: '#FFFFFF',
-        onPrimary: '#FFFFFF',
-        onSecondary: '#FFFFFF',
-        onError: '#FFFFFF',
-        textPrimary: '#212121',
-        textSecondary: '#757575',
-        textDisabled: '#9E9E9E',
-      },
-      spacing: {
-        xs: 4,
-        s: 8,
-        m: 16,
-        l: 24,
-        xl: 32,
-      },
-      shape: {
-        borderRadius: {
-          small: 4,
-          medium: 8,
-          large: 16,
-        },
-      },
-      typography: {
-        fontFamily: {
-          regular: 'System',
-          medium: 'System',
-          bold: 'System',
-        },
-        fontSize: {
-          button: 14,
-        },
+const mockUseAppTheme = () => ({
+  theme: {
+    colors: {
+      primary: '#4CAF50',
+      secondary: '#2196F3',
+      primaryLight: '#A5D6A7',
+      error: '#F44336',
+      surface: '#FFFFFF',
+      onPrimary: '#FFFFFF',
+      onSecondary: '#FFFFFF',
+      onError: '#FFFFFF',
+      textPrimary: '#212121',
+      textSecondary: '#757575',
+      textDisabled: '#9E9E9E',
+    },
+    spacing: {
+      xs: 4,
+      s: 8,
+      m: 16,
+      l: 24,
+      xl: 32,
+    },
+    shape: {
+      borderRadius: {
+        small: 4,
+        medium: 8,
+        large: 16,
       },
     },
-  })),
-  ThemeProvider: ({ children }: { children: React.ReactNode }) => children,
+    typography: {
+      fontFamily: {
+        regular: 'System',
+        medium: 'System',
+        bold: 'System',
+      },
+      fontSize: {
+        button: 14,
+        caption: 12,
+        body1: 16,
+      },
+    },
+  },
+  horizontalScale: (size) => size,
+  verticalScale: (size) => size,
+  moderateScale: (size) => size,
+  fontScale: (size) => size,
+});
+
+jest.mock('../../../theme/ThemeProvider', () => ({
+  useAppTheme: () => mockUseAppTheme(),
+  ThemeProvider: ({ children }) => children,
 }));
 
 describe('Button Component', () => {

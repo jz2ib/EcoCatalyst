@@ -144,7 +144,7 @@ const Alert: React.FC<AlertProps> = ({
       statusBarTranslucent
     >
       <View style={styles.overlay}>
-        <View style={[styles.container, style]}>
+        <View style={[styles.container, style]} testID="alert-container">
           <View style={styles.header}>
             <MaterialIcons name={icon as keyof typeof MaterialIcons.glyphMap} size={28} color={color} />
             <Text style={[styles.title, { color }, titleStyle]} accessibilityRole="header">
