@@ -8,31 +8,33 @@ declare const describe: (name: string, fn: () => void) => void;
 declare const it: (name: string, fn: () => void) => void;
 declare const expect: any;
 
-jest.mock('../../../theme/ThemeProvider', () => ({
-  useAppTheme: jest.fn(() => ({
-    theme: {
-      colors: {
-        surface: '#FFFFFF',
-        border: '#E0E0E0',
-      },
-      spacing: {
-        s: 8,
-        m: 16,
-      },
-      shape: {
-        borderRadius: {
-          small: 4,
-          medium: 8,
-          large: 16,
-        },
-      },
-      elevation: {
-        small: 'shadow',
-        medium: 'shadow',
-        large: 'shadow',
+const mockUseAppTheme = () => ({
+  theme: {
+    colors: {
+      surface: '#FFFFFF',
+      border: '#E0E0E0',
+    },
+    spacing: {
+      s: 8,
+      m: 16,
+    },
+    shape: {
+      borderRadius: {
+        small: 4,
+        medium: 8,
+        large: 16,
       },
     },
-  })),
+    elevation: {
+      small: 'shadow',
+      medium: 'shadow',
+      large: 'shadow',
+    },
+  },
+});
+
+jest.mock('../../../theme/ThemeProvider', () => ({
+  useAppTheme: () => mockUseAppTheme(),
 }));
 
 describe('Card Component', () => {

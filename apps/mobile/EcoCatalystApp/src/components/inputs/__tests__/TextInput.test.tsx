@@ -8,44 +8,46 @@ declare const describe: (name: string, fn: () => void) => void;
 declare const it: (name: string, fn: () => void) => void;
 declare const expect: any;
 
-jest.mock('../../../theme/ThemeProvider', () => ({
-  useAppTheme: jest.fn(() => ({
-    theme: {
-      colors: {
-        primary: '#4CAF50',
-        error: '#F44336',
-        surface: '#FFFFFF',
-        border: '#E0E0E0',
-        textPrimary: '#212121',
-        textSecondary: '#757575',
-        textDisabled: '#9E9E9E',
-      },
-      spacing: {
-        xs: 4,
-        s: 8,
-        m: 16,
-        l: 24,
-      },
-      shape: {
-        borderRadius: {
-          small: 4,
-          medium: 8,
-          large: 16,
-        },
-      },
-      typography: {
-        fontSize: {
-          subtitle2: 14,
-          body1: 16,
-          caption: 12,
-        },
-        fontFamily: {
-          regular: 'System',
-          medium: 'System',
-        },
+const mockUseAppTheme = () => ({
+  theme: {
+    colors: {
+      primary: '#4CAF50',
+      error: '#F44336',
+      surface: '#FFFFFF',
+      border: '#E0E0E0',
+      textPrimary: '#212121',
+      textSecondary: '#757575',
+      textDisabled: '#9E9E9E',
+    },
+    spacing: {
+      xs: 4,
+      s: 8,
+      m: 16,
+      l: 24,
+    },
+    shape: {
+      borderRadius: {
+        small: 4,
+        medium: 8,
+        large: 16,
       },
     },
-  })),
+    typography: {
+      fontSize: {
+        subtitle2: 14,
+        body1: 16,
+        caption: 12,
+      },
+      fontFamily: {
+        regular: 'System',
+        medium: 'System',
+      },
+    },
+  },
+});
+
+jest.mock('../../../theme/ThemeProvider', () => ({
+  useAppTheme: () => mockUseAppTheme(),
   ThemeProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
 

@@ -48,10 +48,36 @@ jest.mock('@expo/vector-icons', () => {
   };
 });
 
-jest.mock('react-native/Libraries/Animated/NativeAnimatedHelper', () => ({
-  __esModule: true,
-  default: {
-    shouldUseNativeDriver: () => false,
-    API: {},
-  },
-}));
+jest.mock('react-native', () => {
+  const reactNative = jest.requireActual('react-native');
+  
+  reactNative.TouchableOpacity = ({ children, onPress, style, disabled, testID }) => {
+    return {
+      type: 'TouchableOpacity',
+      props: {
+        children,
+        onPress,
+        style,
+        disabled,
+        testID
+      },
+    };
+  };
+  
+  reactNative.Animated = {
+    Value: jest.fn(() => ({
+      interpolate: jest.fn(),
+      setValue: jest.fn(),
+    })),
+    View: jest.fn(({ children, style }) => ({
+      type: 'Animated.View',
+      props: { style, children },
+    })),
+    createAnimatedComponent: jest.fn(Component => Component),
+    timing: jest.fn(() => ({
+      start: jest.fn(cb => cb && cb()),
+    })),
+  };
+  
+  return reactNative;
+});

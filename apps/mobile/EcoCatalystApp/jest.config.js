@@ -25,5 +25,8 @@ module.exports = {
     '/android/',
     '/ios/'
   ],
-  moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node']
+  moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
+  moduleNameMapper: {
+    "^react-native/Libraries/Animated/NativeAnimatedHelper$": "<rootDir>/node_modules/react-native/src/private/animated/NativeAnimatedHelper.js"
+  }
 };

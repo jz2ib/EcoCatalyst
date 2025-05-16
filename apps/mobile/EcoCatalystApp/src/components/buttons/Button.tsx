@@ -207,7 +207,8 @@ const Button: React.FC<ButtonProps> = ({
       {loading ? (
         <ActivityIndicator 
           size="small" 
-          color={variant === 'primary' ? theme.colors.onPrimary : theme.colors.primary} 
+          color={variant === 'primary' ? theme.colors.onPrimary : theme.colors.primary}
+          testID="button-loading-indicator"
         />
       ) : (
         <>
