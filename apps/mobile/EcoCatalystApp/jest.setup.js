@@ -32,6 +32,11 @@ jest.mock('firebase/auth', () => ({
   createUserWithEmailAndPassword: jest.fn(),
   signOut: jest.fn(),
   sendPasswordResetEmail: jest.fn(),
+  updateProfile: jest.fn(),
+  onAuthStateChanged: jest.fn((auth, callback) => {
+    callback(null);
+    return jest.fn(); // Return unsubscribe function
+  }),
 }));
 
 jest.mock('@react-native-async-storage/async-storage', () => ({
