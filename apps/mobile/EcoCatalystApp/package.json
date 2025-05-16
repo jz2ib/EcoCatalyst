@@ -24,6 +24,7 @@
     "expo": "~53.0.9",
     "expo-status-bar": "~2.2.3",
     "firebase": "^11.7.1",
+    "openai": "^4.100.0",
     "react": "19.1.0",
     "react-native": "0.79.2",
     "react-native-safe-area-context": "^5.4.0",
