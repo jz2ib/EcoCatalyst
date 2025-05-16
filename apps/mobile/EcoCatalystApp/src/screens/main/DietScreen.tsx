@@ -1,36 +1,16 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
+import { useDiet } from '../../contexts/diet/DietContext';
 
 const DietScreen: React.FC = () => {
   const [message, setMessage] = useState('');
-  const [chatHistory, setChatHistory] = useState([
-    { id: 1, text: 'Hello! I\'m your EcoDiet assistant. How can I help you with sustainable food choices today?', isUser: false },
-  ]);
-
-  const sendMessage = () => {
+  const { chatHistory, sendChatMessage, isLoading, clearChatHistory } = useDiet();
+  
+  const handleSendMessage = async () => {
     if (message.trim() === '') return;
     
-    const newUserMessage = { id: chatHistory.length + 1, text: message, isUser: true };
-    setChatHistory([...chatHistory, newUserMessage]);
-    
+    await sendChatMessage(message);
     setMessage('');
-    
-    setTimeout(() => {
-      let response = '';
-      
-      if (message.toLowerCase().includes('vegetarian')) {
-        response = 'A vegetarian diet can reduce your carbon footprint by up to 30% compared to a meat-heavy diet. Would you like some vegetarian meal suggestions?';
-      } else if (message.toLowerCase().includes('meal plan') || message.toLowerCase().includes('diet plan')) {
-        response = 'I can help you create a sustainable meal plan. What are your dietary preferences and restrictions?';
-      } else if (message.toLowerCase().includes('carbon footprint') || message.toLowerCase().includes('environmental impact')) {
-        response = 'Food production accounts for about 25% of global greenhouse gas emissions. Choosing local, plant-based foods can significantly reduce your environmental impact.';
-      } else {
-        response = 'I\'m here to help you make sustainable food choices. You can ask me about eco-friendly diets, meal plans, or the environmental impact of different foods.';
-      }
-      
-      const newAiMessage = { id: chatHistory.length + 2, text: response, isUser: false };
-      setChatHistory([...chatHistory, newUserMessage, newAiMessage]);
-    }, 1000);
   };
 
   return (
@@ -38,6 +18,9 @@ const DietScreen: React.FC = () => {
       <View style={styles.header}>
         <Text style={styles.title}>EcoDiet Assistant</Text>
         <Text style={styles.subtitle}>AI-powered sustainable diet planning</Text>
+        <TouchableOpacity style={styles.clearButton} onPress={clearChatHistory}>
+          <Text style={styles.clearButtonText}>Clear Chat</Text>
+        </TouchableOpacity>
       </View>
       
       <ScrollView style={styles.chatContainer}>
@@ -46,12 +29,19 @@ const DietScreen: React.FC = () => {
             key={msg.id} 
             style={[
               styles.messageBubble, 
-              msg.isUser ? styles.userMessage : styles.aiMessage
+              msg.sender === 'user' ? styles.userMessage : styles.aiMessage
             ]}
           >
-            <Text style={styles.messageText}>{msg.text}</Text>
+            <Text style={styles.messageText}>{msg.content}</Text>
           </View>
         ))}
+        {chatHistory.length === 0 && (
+          <View style={styles.welcomeMessage}>
+            <Text style={styles.welcomeText}>
+              Hello! I'm your EcoDiet assistant. How can I help you with sustainable food choices today?
+            </Text>
+          </View>
+        )}
       </ScrollView>
       
       <View style={styles.inputContainer}>
@@ -62,10 +52,17 @@ const DietScreen: React.FC = () => {
           placeholder="Ask about sustainable food choices..."
           placeholderTextColor="#999"
           multiline
+          editable={!isLoading}
         />
-        <TouchableOpacity style={styles.sendButton} onPress={sendMessage}>
-          <Text style={styles.sendButtonText}>Send</Text>
-        </TouchableOpacity>
+        {isLoading ? (
+          <View style={styles.sendButton}>
+            <ActivityIndicator color="white" size="small" />
+          </View>
+        ) : (
+          <TouchableOpacity style={styles.sendButton} onPress={handleSendMessage}>
+            <Text style={styles.sendButtonText}>Send</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
@@ -91,6 +88,16 @@ const styles = StyleSheet.create({
     color: 'white',
     marginTop: 5,
   },
+  clearButton: {
+    position: 'absolute',
+    right: 10,
+    bottom: 10,
+    padding: 5,
+  },
+  clearButtonText: {
+    color: 'white',
+    fontSize: 12,
+  },
   chatContainer: {
     flex: 1,
     padding: 15,
@@ -112,6 +119,18 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 5,
   },
   messageText: {
+    fontSize: 16,
+    color: '#333',
+  },
+  welcomeMessage: {
+    backgroundColor: '#E8F5E9',
+    padding: 12,
+    borderRadius: 20,
+    marginBottom: 10,
+    alignSelf: 'flex-start',
+    borderBottomLeftRadius: 5,
+  },
+  welcomeText: {
     fontSize: 16,
     color: '#333',
   },

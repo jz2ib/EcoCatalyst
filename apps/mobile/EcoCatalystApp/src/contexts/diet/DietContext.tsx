@@ -497,6 +497,7 @@ export const DietProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       const updatedChat = [...chatHistory, userMessage];
       setChatHistory(updatedChat);
+      setIsLoading(true);
       
       if (user) {
         const userChatRef = ref(database, `dietChat/${user.uid}`);
@@ -511,35 +512,56 @@ export const DietProvider: React.FC<{ children: React.ReactNode }> = ({ children
         });
       }
       
-      const aiResponse: ChatMessage = {
-        id: `ai_${timestamp + 1}`,
-        userId: user?.uid || 'anonymous',
-        content: 'I understand your request about diet planning. This AI feature will be implemented in a future update.',
-        sender: 'ai',
-        timestamp: timestamp + 1,
-        relatedTo
-      };
+      const openAIHistory = chatHistory.slice(-10).map(msg => ({
+        content: msg.content,
+        sender: msg.sender
+      }));
       
-      const finalChat = [...updatedChat, aiResponse];
-      setChatHistory(finalChat);
-      
-      if (user) {
-        const userChatRef = ref(database, `dietChat/${user.uid}`);
-        const aiMessageRef = push(userChatRef);
-        
-        await set(aiMessageRef, {
-          userId: user.uid,
-          content: aiResponse.content,
-          sender: 'ai',
-          timestamp: aiResponse.timestamp,
-          relatedTo
-        });
-      }
-      
-      await AsyncStorage.setItem(CHAT_HISTORY_STORAGE_KEY, JSON.stringify(finalChat));
+      import('../../services/openai').then(async ({ generateDietResponse }) => {
+        try {
+          const aiResponseData = await generateDietResponse(content, openAIHistory);
+          
+          const aiResponse: ChatMessage = {
+            id: `ai_${timestamp + 1}`,
+            userId: user?.uid || 'anonymous',
+            content: aiResponseData.content,
+            sender: 'ai',
+            timestamp: timestamp + 1,
+            relatedTo
+          };
+          
+          const finalChat = [...updatedChat, aiResponse];
+          setChatHistory(finalChat);
+          
+          if (user) {
+            const userChatRef = ref(database, `dietChat/${user.uid}`);
+            const aiMessageRef = push(userChatRef);
+            
+            await set(aiMessageRef, {
+              userId: user.uid,
+              content: aiResponse.content,
+              sender: 'ai',
+              timestamp: aiResponse.timestamp,
+              relatedTo
+            });
+          }
+          
+          await AsyncStorage.setItem(CHAT_HISTORY_STORAGE_KEY, JSON.stringify(finalChat));
+        } catch (error) {
+          console.error('Error getting AI response:', error);
+          setError('Failed to get AI response. Please try again.');
+        } finally {
+          setIsLoading(false);
+        }
+      }).catch(error => {
+        console.error('Error importing OpenAI service:', error);
+        setError('Failed to load AI service. Please try again.');
+        setIsLoading(false);
+      });
     } catch (error) {
       console.error('Error sending chat message:', error);
       setError('Failed to send message. Please try again.');
+      setIsLoading(false);
     }
   };
   
@@ -560,40 +582,57 @@ export const DietProvider: React.FC<{ children: React.ReactNode }> = ({ children
   
   const generateMealSuggestion = async (mealType: MealType, date: string): Promise<MealEntry | null> => {
     try {
-      
+      setIsLoading(true);
       const timestamp = Date.now();
       const mealId = `suggestion_${timestamp}`;
       
-      const suggestion: MealEntry = {
-        id: mealId,
-        userId: user?.uid || 'anonymous',
-        date,
-        mealType,
-        name: `Suggested ${mealType}`,
-        foods: [
-          {
-            id: 'food1',
-            name: 'Placeholder Food Item',
-            servingSize: '100g',
-            calories: 200,
-            protein: 10,
-            carbs: 20,
-            fat: 5,
-            sustainabilityScore: 80
-          }
-        ],
-        totalCalories: 200,
-        totalProtein: 10,
-        totalCarbs: 20,
-        totalFat: 5,
-        createdAt: timestamp,
-        updatedAt: timestamp
-      };
+      const preferences = currentPlan?.preferences || [];
+      const restrictions = currentPlan?.restrictions || [];
       
-      return suggestion;
+      try {
+        const { generateMealSuggestion } = await import('../../services/openai');
+        const mealData = await generateMealSuggestion(
+          mealType,
+          preferences,
+          restrictions
+        );
+        
+        const suggestion: MealEntry = {
+          id: mealId,
+          userId: user?.uid || 'anonymous',
+          date,
+          mealType,
+          name: mealData.name,
+          description: mealData.description,
+          foods: mealData.foods.map(food => ({
+            id: `food_${Math.random().toString(36).substring(2, 9)}`,
+            name: food.name,
+            servingSize: food.servingSize,
+            calories: food.calories,
+            protein: food.protein,
+            carbs: food.carbs,
+            fat: food.fat,
+            sustainabilityScore: food.sustainabilityScore || 80
+          })),
+          totalCalories: mealData.totalCalories,
+          totalProtein: mealData.totalProtein,
+          totalCarbs: mealData.totalCarbs,
+          totalFat: mealData.totalFat,
+          createdAt: timestamp,
+          updatedAt: timestamp
+        };
+        
+        return suggestion;
+      } catch (error) {
+        console.error('Error with OpenAI meal generation:', error);
+        throw error;
+      } finally {
+        setIsLoading(false);
+      }
     } catch (error) {
       console.error('Error generating meal suggestion:', error);
       setError('Failed to generate meal suggestion. Please try again.');
+      setIsLoading(false);
       return null;
     }
   };
