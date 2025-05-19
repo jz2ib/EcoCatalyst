@@ -16,6 +16,12 @@ ecmaFeatures: {
 jsx: true,
 },
 },
+globals: {
+// React Native globals
+__DEV__: 'readonly',
+require: 'readonly',
+module: 'readonly',
+}
 },
 plugins: {
 '@typescript-eslint': tseslint,
@@ -32,9 +38,6 @@ settings: {
 react: {
 version: 'detect',
 },
-},
-env: {
-'react-native/react-native': true,
 },
 },
 ];
