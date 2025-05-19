@@ -314,7 +314,7 @@ describe('AuthContext', () => {
   it('updates authentication state when user changes', async () => {
     const mockUser = { uid: '123', email: 'test@example.com' };
     
-    mockOnAuthStateChanged.mockImplementationOnce((auth, callback) => {
+    mockOnAuthStateChanged.mockImplementationOnce((auth: any, callback: (user: any) => void) => {
       callback(null);
       return jest.fn();
     });
@@ -329,7 +329,7 @@ describe('AuthContext', () => {
       expect(screen.getByTestId('auth-status').props.children).toBe('Not Authenticated');
     });
 
-    mockOnAuthStateChanged.mockImplementationOnce((auth, callback) => {
+    mockOnAuthStateChanged.mockImplementationOnce((auth: any, callback: (user: any) => void) => {
       callback(mockUser);
       return jest.fn();
     });
