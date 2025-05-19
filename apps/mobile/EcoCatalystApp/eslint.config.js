@@ -8,12 +8,15 @@ export default [
 eslint.configs.recommended,
 {
 files: ['**/*.{js,jsx,ts,tsx}'],
+// Explicitly exclude jest config files
 ignores: [
 'node_modules/**',
 'dist/**',
 'build/**',
-'jest.config.js',
-'jest.setup.js'
+'**/jest.config.js',
+'**/jest.setup.js',
+'**/*.config.js',
+'**/*.setup.js'
 ],
 languageOptions: {
 parser: tseslintParser,
