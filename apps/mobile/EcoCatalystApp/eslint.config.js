@@ -12,7 +12,7 @@ ignores: [
 'node_modules/**',
 'dist/**',
 'build/**',
-'*.config.js',
+'jest.config.js',
 'jest.setup.js'
 ],
 languageOptions: {
@@ -21,16 +21,15 @@ parserOptions: {
 ecmaFeatures: {
 jsx: true,
 },
+ecmaVersion: 'latest',
+sourceType: 'module',
 },
 globals: {
-// Common globals
 console: 'readonly',
 process: 'readonly',
 module: 'readonly',
 require: 'readonly',
-// React Native globals
 __DEV__: 'readonly',
-// Test globals
 jest: 'readonly',
 expect: 'readonly',
 test: 'readonly',
@@ -39,7 +38,6 @@ beforeEach: 'readonly',
 afterEach: 'readonly',
 beforeAll: 'readonly',
 afterAll: 'readonly',
-// Browser globals
 setTimeout: 'readonly',
 clearTimeout: 'readonly',
 setInterval: 'readonly',
@@ -53,13 +51,13 @@ plugins: {
 'react-native': reactNativePlugin,
 },
 rules: {
-// Disable some strict rules for development
 'no-unused-vars': 'warn',
 'no-undef': 'warn',
 '@typescript-eslint/no-explicit-any': 'warn',
 'react/react-in-jsx-scope': 'off',
 'react/prop-types': 'off',
 '@typescript-eslint/explicit-module-boundary-types': 'off',
+'no-empty': 'warn'
 },
 settings: {
 react: {
