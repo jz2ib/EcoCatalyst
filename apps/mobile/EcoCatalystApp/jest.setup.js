@@ -1,3 +1,4 @@
+import { jest, expect, it, describe, beforeEach } from '@jest/globals';
 import '@testing-library/jest-native/extend-expect';
 
 jest.mock('expo-status-bar', () => ({
